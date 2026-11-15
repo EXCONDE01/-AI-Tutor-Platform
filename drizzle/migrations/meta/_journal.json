@@ -71,6 +71,13 @@
       "when": 1794744943553,
       "tag": "0009_worthless_mister_fear",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794761347430,
+      "tag": "0010_fat_ted_forrester",
+      "breakpoints": true
     }
   ]
 }

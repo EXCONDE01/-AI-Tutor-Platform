@@ -6,8 +6,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth/server';
 import { ensureAppUser } from '@/lib/auth/provision';
 import { db } from '@/lib/db';
-import { classes, schools, teachers, users } from '@/db/schema';
-import { eq, desc } from 'drizzle-orm';
+import { classes, classStudents, schools, teachers, users, students } from '@/db/schema';
+import { eq, desc, and } from 'drizzle-orm';
+
+function generateJoinCode(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let code = '';
+  for (let i = 0; i < 8; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -42,6 +51,7 @@ export async function GET(request: NextRequest) {
         subject: classes.subject,
         gradeLevel: classes.gradeLevel,
         status: classes.status,
+        joinCode: classes.joinCode,
         createdAt: classes.createdAt,
       })
       .from(classes)
@@ -109,12 +119,69 @@ export async function POST(request: NextRequest) {
         status: 'active',
         term: 'fall',
         year: new Date().getFullYear(),
+        joinCode: generateJoinCode(),
       })
       .returning();
 
     return NextResponse.json({ class: newClass });
   } catch (error) {
     console.error('[Classes POST] Error:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const authSession = await getSession(request);
+    if (!authSession.data?.user) {
+      return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+    }
+
+    const appUser = await ensureAppUser('teacher', request);
+    if (!appUser || appUser.role !== 'teacher') {
+      return NextResponse.json({ error: 'Teacher access required' }, { status: 403 });
+    }
+
+    const [teacher] = await db
+      .select({ id: teachers.id })
+      .from(teachers)
+      .where(eq(teachers.userId, appUser.user.id))
+      .limit(1);
+
+    if (!teacher) {
+      return NextResponse.json({ error: 'Teacher record not found' }, { status: 404 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const classId = searchParams.get('id');
+
+    if (!classId) {
+      return NextResponse.json({ error: 'Class ID is required' }, { status: 400 });
+    }
+
+    // Verify the class belongs to this teacher
+    const [existingClass] = await db
+      .select({ id: classes.id })
+      .from(classes)
+      .where(and(eq(classes.id, classId), eq(classes.teacherId, teacher.id)))
+      .limit(1);
+
+    if (!existingClass) {
+      return NextResponse.json({ error: 'Class not found or access denied' }, { status: 404 });
+    }
+
+    // Delete all student enrollments for this class first
+    await db.delete(classStudents).where(eq(classStudents.classId, classId));
+
+    // Delete the class
+    await db.delete(classes).where(eq(classes.id, classId));
+
+    return NextResponse.json({ success: true, message: 'Class deleted successfully' });
+  } catch (error) {
+    console.error('[Classes DELETE] Error:', error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Internal server error' },
       { status: 500 }

@@ -20,6 +20,7 @@ export const classes = pgTable('classes', {
   schedule: jsonb('schedule').default({}).notNull(), // { days: [], startTime, endTime, timezone }
   room: text('room'),
   maxStudents: integer('max_students').default(30).notNull(),
+  joinCode: text('join_code').unique(),
   settings: jsonb('settings').default({}).notNull(), // Class-specific settings
   ltiContextId: text('lti_context_id'), // LTI context for this class
   ltiResourceLinkId: text('lti_resource_link_id'),
