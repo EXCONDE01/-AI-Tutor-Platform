@@ -17,6 +17,7 @@ import { Plus, Edit, Trash2, RotateCcw, Loader2, X, Eye, EyeOff } from "lucide-r
 import { toast } from "sonner";
 import { CreatePlatformInput, UpdatePlatformInput } from "@/lib/lti/platform";
 import { LTIPlatformConfig, LTIDeploymentConfig } from "@/lib/lti/types";
+import { AdminLtiPlatformsSkeleton } from "@/components/ui/page-skeletons";
 
 interface District {
   id: string;
@@ -217,13 +218,7 @@ export default function LTIPlatformsClient() {
   };
 
   if (loading) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex justify-center items-center h-64">
-          <Loader2 className="animate-spin h-12 w-12 text-primary" />
-        </div>
-      </div>
-    );
+    return <AdminLtiPlatformsSkeleton />;
   }
 
   if (error) {

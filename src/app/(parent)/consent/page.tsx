@@ -11,6 +11,7 @@ import { CheckCircle, XCircle, AlertCircle, Clock, FileText, UserCheck, Shield, 
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { ConsentForm } from "@/components/parent/ConsentForm";
+import { ParentConsentSkeleton } from "@/components/ui/page-skeletons";
 
 interface ConsentRecord {
   id: string;
@@ -139,23 +140,7 @@ export default function ParentConsentPage() {
   };
 
   if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Consent Management</h1>
-            <p className="text-muted-foreground">Review and manage consent for your children</p>
-          </div>
-        </div>
-        <Card>
-          <CardContent className="py-8">
-            <div className="flex justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <ParentConsentSkeleton />;
   }
 
   return (

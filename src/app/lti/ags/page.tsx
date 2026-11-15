@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Plus, RefreshCw, Loader2, X, Eye } from "lucide-react";
 import { toast } from "sonner";
+import { AGSPageSkeleton } from "@/components/ui/page-skeletons";
 
 interface Platform {
   id: string;
@@ -295,7 +296,10 @@ export default function AGSPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
+      {loading && <AGSPageSkeleton />}
+      {!loading && (
+        <>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">LTI AGS - Assignment & Grade Service</h1>
@@ -680,6 +684,8 @@ export default function AGSPage() {
             and an AGS endpoint before creating line items.
           </AlertDescription>
         </Alert>
+      )}
+        </>
       )}
     </div>
   );

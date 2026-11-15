@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,12 +10,30 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, Link2, CheckCircle, AlertCircle, Info } from "lucide-react";
 import { toast } from "sonner";
+import { CardSkeleton } from "@/components/ui/skeleton";
+import { PageHeaderSkeleton } from "@/components/ui/page-skeletons";
 
 export default function ParentLinkStudentPage() {
   const [linkingCode, setLinkingCode] = useState("");
   const [linking, setLinking] = useState(false);
   const [success, setSuccess] = useState<{ studentName: string; studentId: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setLoading(false), 500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="space-y-6 p-6">
+        <PageHeaderSkeleton showActions showDescription actionCount={1} />
+        <CardSkeleton showHeader showContent contentLines={4} />
+        <CardSkeleton showHeader showContent contentLines={8} />
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

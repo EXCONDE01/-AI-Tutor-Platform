@@ -15,6 +15,7 @@ import { Search, Filter, Download, Calendar, AlertTriangle, Info, AlertCircle, F
 import { format, subDays } from "date-fns";
 import { toast } from "sonner";
 import { AUDIT_RESOURCE_TYPES, AUDIT_RESOURCE_TYPE_LABELS, AUDIT_DB_ACTIONS } from "@/lib/compliance/audit-options";
+import { AdminAuditSkeleton } from "@/components/ui/page-skeletons";
 
 interface AuditLog {
   id: string;
@@ -54,6 +55,7 @@ export default function AuditPage() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [stats, setStats] = useState<ComplianceStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const [total, setTotal] = useState(0);
@@ -124,6 +126,11 @@ export default function AuditPage() {
     fetchStats();
   }, [fetchLogs, fetchStats]);
 
+  React.useEffect(() => {
+    const timer = setTimeout(() => setInitialLoading(false), 500);
+    return () => clearTimeout(timer);
+  }, []);
+
   const handleExport = async () => {
     try {
       const params = new URLSearchParams({
@@ -180,6 +187,10 @@ export default function AuditPage() {
       .map(w => w.charAt(0).toUpperCase() + w.slice(1))
       .join(" ");
   };
+
+  if (initialLoading) {
+    return <AdminAuditSkeleton />;
+  }
 
   return (
     <div className="space-y-6">

@@ -16,6 +16,7 @@ import { Plus, Edit, Trash2, Eye, EyeOff, Loader2, X, AlertCircle, CheckCircle }
 import { toast } from "sonner";
 import { CreateDeploymentInput, UpdateDeploymentInput } from "@/lib/lti/platform";
 import { LTIDeploymentConfig, LTIPlatformConfig } from "@/lib/lti/types";
+import { AdminLtiDeploymentsSkeleton } from "@/components/ui/page-skeletons";
 
 interface PlatformOption {
   id: string;
@@ -207,13 +208,7 @@ export default function LTIDeploymentsClient() {
   };
 
   if (loading) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex justify-center items-center h-64">
-          <Loader2 className="animate-spin h-12 w-12 text-primary" />
-        </div>
-      </div>
-    );
+    return <AdminLtiDeploymentsSkeleton />;
   }
 
   if (error) {

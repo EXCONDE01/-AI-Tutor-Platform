@@ -15,6 +15,7 @@ import { Search, Filter, Download, AlertTriangle, CheckCircle, XCircle, Clock, U
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { AdminComplianceConsentSkeleton } from "@/components/ui/page-skeletons";
 
 interface ConsentRecord {
   id: string;
@@ -46,6 +47,7 @@ interface ConsentRecord {
 export default function AdminConsentPage() {
   const [records, setRecords] = useState<ConsentRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const [total, setTotal] = useState(0);
@@ -99,6 +101,11 @@ export default function AdminConsentPage() {
     fetchRecords();
   }, [fetchRecords]);
 
+  React.useEffect(() => {
+    const timer = setTimeout(() => setInitialLoading(false), 500);
+    return () => clearTimeout(timer);
+  }, []);
+
   const handleFerpaAction = async (recordId: string, approved: boolean) => {
     try {
       const res = await fetch("/api/admin/compliance/consent", {
@@ -145,6 +152,10 @@ export default function AdminConsentPage() {
   const getTypeLabel = (type: string) => {
     return type.split("_").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
   };
+
+  if (initialLoading) {
+    return <AdminComplianceConsentSkeleton />;
+  }
 
   return (
     <div className="space-y-6">

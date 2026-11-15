@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { FileText, Users, Clock, Shield, Loader2, Activity, GraduationCap } from "lucide-react";
 import { SessionViewer } from "@/components/parent/SessionViewer";
 import { ProgressSummary } from "@/components/parent/ProgressSummary";
+import { ParentChildDetailSkeleton } from "@/components/ui/page-skeletons";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
@@ -76,26 +77,7 @@ export default function ParentChildProgressPage() {
   }, [resolvedStudentId]);
 
   if (loading || !progress) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Child Progress</h1>
-            <p className="text-muted-foreground">Read-only view of your child&apos;s learning activity</p>
-          </div>
-          <Link href="/parent/children" className="button">
-            <Button variant="outline">Back to Children</Button>
-          </Link>
-        </div>
-        <Card>
-          <CardContent className="py-8">
-            <div className="flex justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <ParentChildDetailSkeleton />;
   }
 
   return (

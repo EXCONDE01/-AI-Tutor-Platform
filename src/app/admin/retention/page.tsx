@@ -15,6 +15,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { Plus, Search, Filter, Play, AlertTriangle, Clock, Archive, Trash2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+import { AdminRetentionSkeleton } from "@/components/ui/page-skeletons";
 import { RetentionCategory } from "@/lib/compliance/types";
 
 const categories = [
@@ -104,6 +105,7 @@ interface RetentionPolicy {
 export default function RetentionPage() {
   const [policies, setPolicies] = useState<RetentionPolicy[]>([]);
   const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [total, setTotal] = useState(0);
@@ -157,6 +159,11 @@ export default function RetentionPage() {
   React.useEffect(() => {
     fetchPolicies();
   }, [page, pageSize, search, categoryFilter, isActiveFilter]);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => setInitialLoading(false), 500);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleSubmit = async (data: FormData) => {
     setIsSubmitting(true);
@@ -263,6 +270,10 @@ export default function RetentionPage() {
   const getCategoryBadge = (category: string) => (
     <Badge variant="outline">{categoryLabels[category] || category}</Badge>
   );
+
+  if (initialLoading) {
+    return <AdminRetentionSkeleton />;
+  }
 
   return (
     <div className="space-y-6">

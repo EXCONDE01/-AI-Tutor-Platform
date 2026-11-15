@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import { ArrowLeft, MessageSquare, Users, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TutorChat } from "@/components/student/TutorChat";
+import { TeacherNewSessionSkeleton } from "@/components/ui/page-skeletons";
 
 const mockStudents = [
   { id: "1", name: "Sarah Johnson", class: "Algebra I - Period 3" },
@@ -32,6 +33,19 @@ export default function NewSessionPage() {
   const [selectedClass, setSelectedClass] = useState<string>("");
   const [isCreating, setIsCreating] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Simulate fetching students and classes
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (loading) {
+    return <TeacherNewSessionSkeleton />;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

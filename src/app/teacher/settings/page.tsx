@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { signOut } from "@/lib/auth/client";
-import { CardSkeleton, PageHeaderSkeleton } from "@/components/ui/skeleton";
+import { TeacherSettingsSkeleton } from "@/components/ui/page-skeletons";
 
 interface GoogleStatus {
   connected: boolean;
@@ -32,7 +32,18 @@ export default function TeacherSettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  const checkGoogleStatus = async () => {
+    try {
+      const res = await fetch("/api/auth/google/status", { credentials: "include" });
+      const data: GoogleStatus = await res.json();
+      setGoogleConnected(data.connected);
+    } catch {
+      setGoogleConnected(false);
+    }
+  };
+
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     checkGoogleStatus();
     
     // Check for URL params from OAuth callback
@@ -48,19 +59,9 @@ export default function TeacherSettingsPage() {
     }
   }, []);
 
-  const checkGoogleStatus = async () => {
-    try {
-      const res = await fetch("/api/auth/google/status", { credentials: "include" });
-      const data: GoogleStatus = await res.json();
-      setGoogleConnected(data.connected);
-    } catch {
-      setGoogleConnected(false);
-    }
-  };
-
   const handleConnectGoogle = () => {
     setConnecting(true);
-    window.location.href = "/api/auth/google";
+    router.push("/api/auth/google");
   };
 
   const handleDisconnectGoogle = async () => {
@@ -92,12 +93,7 @@ export default function TeacherSettingsPage() {
 
   // Show skeleton while checking connection status
   if (googleConnected === null) {
-    return (
-      <div className="max-w-3xl mx-auto p-6 space-y-6">
-        <PageHeaderSkeleton showDescription />
-        <CardSkeleton showHeader showContent />
-      </div>
-    );
+    return <TeacherSettingsSkeleton />;
   }
 
   return (

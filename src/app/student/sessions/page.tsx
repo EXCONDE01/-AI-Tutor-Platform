@@ -4,7 +4,8 @@ import * as React from "react";
 import { useState, useEffect } from "react";
 import { TutorChat } from "@/components/student/TutorChat";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton, CardSkeleton, PageHeaderSkeleton, GridSkeleton } from "@/components/ui/skeleton";
+import { StudentSessionsSkeleton, TutorChatSkeleton } from "@/components/ui/page-skeletons";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function StudentSessionsPage() {
   const [loading, setLoading] = useState(true);
@@ -19,12 +20,7 @@ export default function StudentSessionsPage() {
   }, []);
 
   if (loading) {
-    return (
-      <div className="space-y-6 p-6">
-        <PageHeaderSkeleton showDescription />
-        <GridSkeleton columns={3} rows={1} />
-      </div>
-    );
+    return <StudentSessionsSkeleton />;
   }
 
   return (

@@ -14,6 +14,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Plus, Loader2, X, Eye, Download, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { NRPSPageSkeleton } from "@/components/ui/page-skeletons";
 
 interface NRPSMember {
   id: string;
@@ -229,7 +230,10 @@ export default function NRPSPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
+      {loading && <NRPSPageSkeleton />}
+      {!loading && (
+        <>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">NRPS Roster Sync</h1>
@@ -545,6 +549,8 @@ export default function NRPSPage() {
           )}
         </DialogContent>
       </Dialog>
+        </>
+      )}
     </div>
   );
 }

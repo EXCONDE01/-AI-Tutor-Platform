@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { BookOpen, Clock, Trophy } from "lucide-react";
-import { Skeleton, CardSkeleton, PageHeaderSkeleton, GridSkeleton } from "@/components/ui/skeleton";
+import { StudentClassesSkeleton } from "@/components/ui/page-skeletons";
 
 export default function StudentClassesPage() {
   const [loading, setLoading] = useState(true);
@@ -24,12 +24,7 @@ export default function StudentClassesPage() {
   }, []);
 
   if (loading) {
-    return (
-      <div className="space-y-6 p-6">
-        <PageHeaderSkeleton showDescription />
-        <GridSkeleton columns={3} rows={1} />
-      </div>
-    );
+    return <StudentClassesSkeleton />;
   }
 
   return (

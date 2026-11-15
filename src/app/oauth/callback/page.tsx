@@ -4,6 +4,7 @@ import * as React from "react";
 import { useEffect, Suspense, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
+import { OAuthCallbackSkeleton } from "@/components/ui/page-skeletons";
 
 function OAuthCallbackContent() {
   const router = useRouter();

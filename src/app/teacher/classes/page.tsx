@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { TeacherClassesSkeleton } from "@/components/ui/page-skeletons";
 
 export default function TeacherClassesPage() {
   const router = useRouter();
@@ -19,6 +20,12 @@ export default function TeacherClassesPage() {
   const [name, setName] = useState("");
   const [subject, setSubject] = useState("");
   const [gradeLevel, setGradeLevel] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setLoading(false), 500);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,6 +54,10 @@ export default function TeacherClassesPage() {
       setCreating(false);
     }
   };
+
+  if (loading) {
+    return <TeacherClassesSkeleton />;
+  }
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto p-6">

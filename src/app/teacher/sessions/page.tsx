@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Filter, MessageSquare, Clock, CheckCircle, AlertTriangle } from "lucide-react";
-import { Skeleton, CardSkeleton, TableSkeleton, ButtonSkeleton, PageHeaderSkeleton, SelectSkeleton } from "@/components/ui/skeleton";
+import { TeacherSessionsSkeleton } from "@/components/ui/page-skeletons";
 
 export default function TeacherSessionsPage() {
   const [loading, setLoading] = useState(true);
@@ -29,12 +29,7 @@ export default function TeacherSessionsPage() {
   }, []);
 
   if (loading) {
-    return (
-      <div className="space-y-6 p-6">
-        <PageHeaderSkeleton showActions showDescription />
-        <CardSkeleton showHeader showContent={false} />
-      </div>
-    );
+    return <TeacherSessionsSkeleton />;
   }
 
   return (

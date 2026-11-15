@@ -3,6 +3,7 @@ import { ShieldAlert, LogIn, ArrowRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getAppUser } from "@/lib/auth/provision";
+import { UnauthorizedSkeleton } from "@/components/ui/page-skeletons";
 
 export const dynamic = "force-dynamic";
 

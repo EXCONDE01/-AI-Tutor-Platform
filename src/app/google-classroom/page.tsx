@@ -27,6 +27,7 @@ import {
   Users,
   X,
 } from 'lucide-react';
+import { GoogleClassroomSkeleton } from "@/components/ui/page-skeletons";
 
 interface Course {
   id: string;
@@ -73,6 +74,7 @@ export default function GoogleClassroomPage() {
   const [loading, setLoading] = useState(false);
   const [rosterLoading, setRosterLoading] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [importPlatformId, setImportPlatformId] = useState<string>('');
   const [importCourseId, setImportCourseId] = useState<string>('');
 
@@ -99,6 +101,11 @@ export default function GoogleClassroomPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchConnectedState();
   }, [fetchConnectedState]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setInitialLoading(false), 500);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleConnect = async () => {
     try {
@@ -178,7 +185,10 @@ export default function GoogleClassroomPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
+      {initialLoading && <GoogleClassroomSkeleton />}
+      {!initialLoading && (
+        <>
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold">Google Classroom</h1>
@@ -410,6 +420,8 @@ export default function GoogleClassroomPage() {
             </Button>
           </CardContent>
         </Card>
+      )}
+        </>
       )}
     </div>
   );

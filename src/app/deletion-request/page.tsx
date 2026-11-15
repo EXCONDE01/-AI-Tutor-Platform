@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import * as React from "react";
 import { useState, useCallback, useEffect } from "react";
 import { format, formatDistanceToNow } from "date-fns";
+import { DeletionRequestSkeleton } from "@/components/ui/page-skeletons";
 
 const LEGAL_BASES = [
   { value: "gdpr", label: "GDPR (Right to Erasure - Art. 17)" },
@@ -52,6 +53,7 @@ export default function DeletionRequestPage() {
   const [requestId, setRequestId] = useState<string | null>(null);
   const [requests, setRequests] = useState<DeletionRequestSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [legalBasis, setLegalBasis] = useState("gdpr");
   const [reason, setReason] = useState("");
   const [includeBackups, setIncludeBackups] = useState(false);
@@ -79,6 +81,11 @@ export default function DeletionRequestPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchRequests();
   }, [fetchRequests]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setInitialLoading(false), 500);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -131,7 +138,10 @@ export default function DeletionRequestPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
+      {initialLoading && <DeletionRequestSkeleton />}
+      {!initialLoading && (
+        <>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Request Data Deletion</h1>
@@ -271,6 +281,8 @@ export default function DeletionRequestPage() {
           )}
         </CardContent>
       </Card>
+        </>
+      )}
     </div>
   );
 }

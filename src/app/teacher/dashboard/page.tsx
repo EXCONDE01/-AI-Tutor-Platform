@@ -4,7 +4,7 @@ import * as React from "react";
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, BookOpen, MessageSquare, BarChart3, TrendingUp, Clock, CheckCircle, AlertTriangle, Zap } from "lucide-react";
-import { Skeleton, CardSkeleton, StatCardSkeleton, ChartSkeleton, ListItemSkeleton } from "@/components/ui/skeleton";
+import { TeacherDashboardSkeleton } from "@/components/ui/page-skeletons";
 
 export default function TeacherDashboardPage() {
   const [loading, setLoading] = useState(true);
@@ -25,32 +25,7 @@ export default function TeacherDashboardPage() {
   }, []);
 
   if (loading) {
-    return (
-      <div className="space-y-6 p-6">
-        {/* Welcome Section Skeleton */}
-        <div className="mb-8">
-          <div className="flex items-center gap-4">
-            <Skeleton className="h-5 w-1/3" variant="text" />
-            <Skeleton className="h-5 w-1/2" variant="text" />
-          </div>
-          <div className="mt-4 h-4 w-1/2 bg-muted rounded" />
-        </div>
-
-        {/* Stats Cards Skeletons */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
-          <StatCardSkeleton />
-          <StatCardSkeleton />
-          <StatCardSkeleton />
-          <StatCardSkeleton />
-        </div>
-
-        {/* Quick Actions & Recent Activity Skeletons */}
-        <div className="grid gap-6 lg:grid-cols-2">
-          <CardSkeleton showHeader showContent={false} />
-          <CardSkeleton showHeader showContent={false} />
-        </div>
-      </div>
-    );
+    return <TeacherDashboardSkeleton />;
   }
 
   return (
