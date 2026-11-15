@@ -174,7 +174,7 @@ function SignUpContent() {
                     <div className="flex items-center gap-4">
                       <div
                         className={cn(
-                          "flex-shrink-0 h-12 w-12 items-center justify-center rounded-lg transition-colors",
+                          "flex-shrink-0 flex h-12 w-12 items-center justify-center rounded-lg transition-colors",
                           isSelected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
                         )}
                       >
