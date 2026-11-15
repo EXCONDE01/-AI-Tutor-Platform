@@ -15,6 +15,7 @@ const neonMiddleware = auth.middleware({
     "/",
     "/api/auth/(.*)",
     "/api/push/subscribe",
+    "/api/onboarding",
     "/sign-in",
     "/sign-up",
     "/forgot-password",
@@ -48,11 +49,13 @@ const PUBLIC_PATHS = new Set([
   "/favicon.ico",
   "/manifest.json",
   "/sw.js",
+  "/api/onboarding",
 ]);
 
 const PUBLIC_PREFIXES = [
   "/api/auth/",
   "/api/push/subscribe",
+  "/api/onboarding",
   "/_next/",
   "/icons/",
 ];
