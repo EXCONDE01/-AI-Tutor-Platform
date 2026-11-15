@@ -10,7 +10,12 @@ export const dynamic = "force-dynamic";
 export default async function HomePage() {
   // Authorize against the app-level role in the `users` table.
   // Neon Auth's session.user.role is always "user", so it cannot be used here.
-  const appUser = await getAppUser();
+  let appUser = null;
+  try {
+    appUser = await getAppUser();
+  } catch (error) {
+    console.error('[HomePage] getAppUser error:', error);
+  }
 
   if (appUser) {
     if (appUser.role === "admin") {
