@@ -57,9 +57,10 @@ function SignInContent() {
             router.refresh();
           }
         } else {
-          // Fallback to callback URL
-          router.push(callbackUrl);
-          router.refresh();
+          // Role lookup failed - log and show error instead of silently going home
+          const errorBody = await roleResponse.json();
+          console.error('[SignIn] Role lookup failed:', roleResponse.status, errorBody);
+          setErrorMessage(`Session established but role lookup failed (${roleResponse.status}). Please try signing in again.`);
         }
       }
     } catch (err) {

@@ -56,6 +56,7 @@ const PUBLIC_PREFIXES = [
   "/api/auth/",
   "/api/push/subscribe",
   "/api/onboarding",
+  "/api/auth/role",
   "/_next/",
   "/icons/",
 ];
