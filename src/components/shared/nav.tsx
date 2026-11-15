@@ -153,7 +153,7 @@ export function NavMain({ role, onClose, compact = false }: { role: "teacher" | 
   );
 }
 
-export function NavUser({ displayName, role }: { displayName?: string; role: "teacher" | "student" | "parent" | "admin" }) {
+export function NavUser({ displayName, role, onClose }: { displayName?: string; role: "teacher" | "student" | "parent" | "admin"; onClose?: () => void }) {
   const { data: session } = useSession();
   const router = useRouter();
   const user = session?.user;
@@ -201,11 +201,11 @@ export function NavUser({ displayName, role }: { displayName?: string; role: "te
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem>
-          <span className="flex w-full items-center gap-2 opacity-50 cursor-pointer">
+        <DropdownMenuItem asChild>
+          <Link href={`/${role}/settings`} onClick={onClose} className="flex w-full items-center gap-2">
             <Settings className="h-4 w-4" />
-            <span>Settings <span className="text-xs text-muted-foreground ml-2">(coming soon)</span></span>
-          </span>
+            <span>Settings</span>
+          </Link>
         </DropdownMenuItem>
         <DropdownMenuItem>
           <span className="flex w-full items-center gap-2 opacity-50 cursor-pointer">
@@ -278,7 +278,7 @@ export function Header({ role, title, description, actions, displayName }: {
       </div>
       <div className="flex items-center gap-2">
         {actions}
-        <NavUser displayName={displayName} role={actualRole} />
+        <NavUser displayName={displayName} role={actualRole} onClose={() => setMobileMenuOpen(false)} />
         {/* Mobile menu button */}
         <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
           <SheetTrigger asChild>
@@ -299,7 +299,7 @@ export function Header({ role, title, description, actions, displayName }: {
             </div>
             <NavMain role={actualRole} onClose={() => setMobileMenuOpen(false)} />
             <div className="border-t p-4">
-              <NavUser displayName={displayName} role={actualRole} />
+              <NavUser displayName={displayName} role={actualRole} onClose={() => setMobileMenuOpen(false)} />
             </div>
           </SheetContent>
         </Sheet>
