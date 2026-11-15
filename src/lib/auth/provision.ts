@@ -139,18 +139,44 @@ export async function ensureAppUser(
     .where(or(eq(users.email, email), eq(users.externalId, authUserId)))
     .limit(2);
 
-  const existingUser =
-    candidates.find((candidate) => candidate.email === email) ?? candidates[0];
+  const existingByEmail = candidates.find((candidate) => candidate.email === email);
+  const existingByExternalId = candidates.find((candidate) => candidate.externalId === authUserId);
 
-  // If user exists, return with their existing role (don't change roles silently)
-  if (existingUser) {
-    const existingRole = existingUser.role as AppRole;
-    // Verify profile row exists for their role
-    await ensureProfileRow(database, existingUser.id, existingRole);
-    const result: ProvisionResult = { user: existingUser, role: existingRole };
+  // Case 1: Exact match by externalId (same Neon Auth account) - return existing
+  if (existingByExternalId) {
+    const existingRole = existingByExternalId.role as AppRole;
+    await ensureProfileRow(database, existingByExternalId.id, existingRole);
+    const result: ProvisionResult = { user: existingByExternalId, role: existingRole };
     setCachedAppUser(authUserId, result);
     return result;
   }
+
+  // Case 2: Match by email but different externalId (re-registered with new Neon Auth account)
+  // Update the externalId and use the requested role
+  if (existingByEmail) {
+    const updatedUser = await database
+      .update(users)
+      .set({
+        externalId: authUserId,
+        role,
+        emailVerified: authUser.emailVerified ?? false,
+        avatarUrl: authUser.image ?? null,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, existingByEmail.id))
+      .returning()
+      .then((rows: typeof users.$inferSelect[]) => rows[0]);
+
+    if (updatedUser) {
+      // Ensure profile row for the NEW role
+      await ensureProfileRow(database, updatedUser.id, role);
+      const result: ProvisionResult = { user: updatedUser, role };
+      setCachedAppUser(authUserId, result);
+      return result;
+    }
+  }
+
+  // Case 3: No existing user - create new
 
   // Split name from auth user
   const fullName = authUser.name ?? '';
