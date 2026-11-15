@@ -29,6 +29,7 @@ function SignInContent() {
 
     try {
       const result = await signInWithEmail(email, password);
+      console.log('[SignIn] Result:', result);
 
       if (result.error) {
         setErrorMessage(result.error.message || "Sign in failed");
@@ -61,8 +62,9 @@ function SignInContent() {
         }
       }
     } catch (err) {
-      setErrorMessage("An unexpected error occurred. Please try again.");
-      console.error(err);
+      const message = err instanceof Error ? err.message : String(err);
+      setErrorMessage(message || "An unexpected error occurred. Please try again.");
+      console.error('[SignIn] Error:', err);
     } finally {
       setIsLoading(false);
     }

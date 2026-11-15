@@ -80,9 +80,11 @@ function SignUpContent() {
 
     try {
       const result = await signUpWithEmail(email, password, name);
+      console.log('[SignUp] Result:', result);
 
       if (result.error) {
-        setErrorMessage(result.error.message || "Sign up failed");
+        const msg = result.error?.message || result.error?.statusText || "Sign up failed";
+        setErrorMessage(msg);
       } else {
         // Register app-level role via onboarding API
         await fetch("/api/onboarding", {
@@ -118,8 +120,9 @@ function SignUpContent() {
         }
       }
     } catch (err) {
-      setErrorMessage("An unexpected error occurred. Please try again.");
-      console.error(err);
+      const message = err instanceof Error ? err.message : String(err);
+      setErrorMessage(message || "An unexpected error occurred. Please try again.");
+      console.error('[SignUp] Error:', err);
     } finally {
       setIsLoading(false);
     }
