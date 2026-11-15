@@ -16,6 +16,7 @@ function SignInContent() {
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/";
   const error = searchParams.get("error");
+  const registered = searchParams.get("registered") === "true";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -82,6 +83,15 @@ function SignInContent() {
             <Alert variant="destructive" className="gap-2">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>{errorMessage}</AlertDescription>
+            </Alert>
+          )}
+
+          {registered && (
+            <Alert variant="default" className="gap-2">
+              <AlertCircle className="h-4 w-4 text-muted-foreground" />
+              <AlertDescription className="text-sm">
+                Account created successfully! Please sign in to continue.
+              </AlertDescription>
             </Alert>
           )}
 

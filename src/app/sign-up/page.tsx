@@ -87,37 +87,19 @@ function SignUpContent() {
         setErrorMessage(msg);
       } else {
         // Register app-level role via onboarding API
-        await fetch("/api/onboarding", {
+        console.log('[SignUp] Calling onboarding with role:', selectedRole);
+        const onboardingRes = await fetch("/api/onboarding", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ role: selectedRole }),
         });
+        const onboardingData = await onboardingRes.json();
+        console.log('[SignUp] Onboarding response:', onboardingRes.status, onboardingData);
 
-        // Fetch the app-level role from the API
-        const roleResponse = await fetch("/api/auth/role");
-        if (roleResponse.ok) {
-          const { role } = await roleResponse.json();
-
-          if (role === "admin") {
-            router.push("/admin/lti/platforms");
-            router.refresh();
-          } else if (role === "teacher") {
-            router.push("/teacher/dashboard");
-            router.refresh();
-          } else if (role === "student") {
-            router.push("/student/classes");
-            router.refresh();
-          } else if (role === "parent") {
-            router.push("/parent/children");
-            router.refresh();
-          } else {
-            router.push(callbackUrl);
-            router.refresh();
-          }
-        } else {
-          router.push(callbackUrl);
-          router.refresh();
-        }
+        // Redirect to sign-in - session needs to be established first
+        // The sign-in flow will handle role-based redirect
+        router.push("/sign-in?registered=true");
+        router.refresh();
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
