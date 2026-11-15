@@ -1,3 +1,7 @@
+"use client";
+
+import * as React from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -5,15 +9,34 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Filter, MessageSquare, Clock, CheckCircle, AlertTriangle } from "lucide-react";
-
-const mockSessions = [
-  { id: "1", student: "Sarah Johnson", class: "Algebra I - Period 3", status: "active", started: "2 hours ago", messages: 12 },
-  { id: "2", student: "Marcus Chen", class: "Algebra I - Period 3", status: "completed", started: "4 hours ago", messages: 8 },
-  { id: "3", student: "Emily Rodriguez", class: "English Literature", status: "active", started: "30 min ago", messages: 5 },
-  { id: "4", student: "James Wilson", class: "World History", status: "completed", started: "1 day ago", messages: 15 },
-];
+import { Skeleton, CardSkeleton, TableSkeleton, ButtonSkeleton, PageHeaderSkeleton, SelectSkeleton } from "@/components/ui/skeleton";
 
 export default function TeacherSessionsPage() {
+  const [loading, setLoading] = useState(true);
+  const [sessions, setSessions] = useState<any[]>([]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSessions([
+        { id: "1", student: "Sarah Johnson", class: "Algebra I - Period 3", status: "active", started: "2 hours ago", messages: 12 },
+        { id: "2", student: "Marcus Chen", class: "Algebra I - Period 3", status: "completed", started: "4 hours ago", messages: 8 },
+        { id: "3", student: "Emily Rodriguez", class: "English Literature", status: "active", started: "30 min ago", messages: 5 },
+        { id: "4", student: "James Wilson", class: "World History", status: "completed", started: "1 day ago", messages: 15 },
+      ]);
+      setLoading(false);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="space-y-6 p-6">
+        <PageHeaderSkeleton showActions showDescription />
+        <CardSkeleton showHeader showContent={false} />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -60,7 +83,7 @@ export default function TeacherSessionsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {mockSessions.map((session) => (
+              {sessions.map((session) => (
                 <TableRow key={session.id}>
                   <TableCell className="font-medium">{session.student}</TableCell>
                   <TableCell>{session.class}</TableCell>

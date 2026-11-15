@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { signOut } from "@/lib/auth/client";
+import { CardSkeleton, PageHeaderSkeleton } from "@/components/ui/skeleton";
 
 interface GoogleStatus {
   connected: boolean;
@@ -89,6 +90,16 @@ export default function TeacherSettingsPage() {
     router.push("/sign-in");
   };
 
+  // Show skeleton while checking connection status
+  if (googleConnected === null) {
+    return (
+      <div className="max-w-3xl mx-auto p-6 space-y-6">
+        <PageHeaderSkeleton showDescription />
+        <CardSkeleton showHeader showContent />
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-3xl mx-auto p-6 space-y-6">
       <div className="flex items-center gap-3">
@@ -122,9 +133,7 @@ export default function TeacherSettingsPage() {
                 Connect your Google account to export tutor-generated content directly to Google Workspace.
               </p>
             </div>
-            {googleConnected === null ? (
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            ) : googleConnected ? (
+            {googleConnected ? (
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2 text-green-600">
                   <CheckCircle className="h-5 w-5" />

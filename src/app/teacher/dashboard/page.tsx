@@ -1,7 +1,58 @@
+"use client";
+
+import * as React from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, BookOpen, MessageSquare, BarChart3, TrendingUp, Clock, CheckCircle, AlertTriangle, Zap } from "lucide-react";
+import { Skeleton, CardSkeleton, StatCardSkeleton, ChartSkeleton, ListItemSkeleton } from "@/components/ui/skeleton";
 
-export default async function TeacherDashboardPage() {
+export default function TeacherDashboardPage() {
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<any>(null);
+
+  useEffect(() => {
+    // Simulate data fetch - in production, replace with real API call
+    const timer = setTimeout(() => {
+      setStats({
+        activeClasses: 3,
+        totalStudents: 87,
+        sessionsThisWeek: 12,
+        avgProgress: "78%",
+      });
+      setLoading(false);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="space-y-6 p-6">
+        {/* Welcome Section Skeleton */}
+        <div className="mb-8">
+          <div className="flex items-center gap-4">
+            <Skeleton className="h-5 w-1/3" variant="text" />
+            <Skeleton className="h-5 w-1/2" variant="text" />
+          </div>
+          <div className="mt-4 h-4 w-1/2 bg-muted rounded" />
+        </div>
+
+        {/* Stats Cards Skeletons */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
+          <StatCardSkeleton />
+          <StatCardSkeleton />
+          <StatCardSkeleton />
+          <StatCardSkeleton />
+        </div>
+
+        {/* Quick Actions & Recent Activity Skeletons */}
+        <div className="grid gap-6 lg:grid-cols-2">
+          <CardSkeleton showHeader showContent={false} />
+          <CardSkeleton showHeader showContent={false} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Welcome Section */}
@@ -18,7 +69,7 @@ export default async function TeacherDashboardPage() {
             <BookOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">3</div>
+            <div className="text-2xl font-bold">{stats.activeClasses}</div>
             <p className="text-xs text-muted-foreground">Total classes</p>
           </CardContent>
         </Card>
@@ -28,7 +79,7 @@ export default async function TeacherDashboardPage() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">87</div>
+            <div className="text-2xl font-bold">{stats.totalStudents}</div>
             <p className="text-xs text-muted-foreground">Across all classes</p>
           </CardContent>
         </Card>
@@ -38,7 +89,7 @@ export default async function TeacherDashboardPage() {
             <MessageSquare className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">12</div>
+            <div className="text-2xl font-bold">{stats.sessionsThisWeek}</div>
             <p className="text-xs text-muted-foreground">Tutoring sessions</p>
           </CardContent>
         </Card>
@@ -48,7 +99,7 @@ export default async function TeacherDashboardPage() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">78%</div>
+            <div className="text-2xl font-bold">{stats.avgProgress}</div>
             <p className="text-xs text-muted-foreground">Completion rate</p>
           </CardContent>
         </Card>

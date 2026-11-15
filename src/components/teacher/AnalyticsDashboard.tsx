@@ -25,6 +25,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { StatCardSkeleton, CardSkeleton, ChartSkeleton, TableSkeleton, Skeleton } from "@/components/ui/skeleton";
 
 interface AnalyticsData {
   overview: {
@@ -224,21 +225,26 @@ export function TeacherAnalyticsDashboard() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Analytics</h1>
-            <p className="text-muted-foreground">Student progress and engagement insights</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Loader2 className="h-5 w-5 animate-spin text-primary" />
-          </div>
+      <div className="space-y-6 p-6">
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-5 w-1/3" variant="text" />
+          <Skeleton className="h-5 w-1/2" variant="text" />
         </div>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {[1,2,3,4].map(i => (
-            <Card key={i}><CardContent className="py-6"><div className="h-4 bg-muted animate-pulse rounded w-1/2 mx-auto" /></CardContent></Card>
-          ))}
+          <StatCardSkeleton />
+          <StatCardSkeleton />
+          <StatCardSkeleton />
+          <StatCardSkeleton />
         </div>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <CardSkeleton showHeader showContent={false} />
+          <CardSkeleton showHeader showContent={false} />
+        </div>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <ChartSkeleton type="line" />
+          <ChartSkeleton type="bar" />
+        </div>
+        <ChartSkeleton height={350} />
       </div>
     );
   }
