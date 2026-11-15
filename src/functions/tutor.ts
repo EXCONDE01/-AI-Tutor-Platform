@@ -16,7 +16,12 @@ import * as schema from '../../db/schema';
 
 // Types
 interface TutorRequest {
-  action: 'chat' | 'intervene' | 'summarize' | 'generate_artifact';
+  action:
+    | 'chat'
+    | 'intervene'
+    | 'summarize'
+    | 'generate_artifact'
+    | 'export';
   sessionId: string;
   teacherId?: string;
   studentId?: string;
@@ -136,6 +141,9 @@ function getDb() {
   return drizzle(sql, { schema });
 }
 
+// Import export tools
+import { exportTools, type ExportToolNames } from './tools/export-tools';
+
 // Build system prompt helper
 function buildSystemPrompt(session: typeof schema.tutorSessions.$inferSelect & { 
   student: typeof schema.students.$inferSelect & { user: typeof schema.users.$inferSelect };
@@ -239,6 +247,9 @@ export const handler = async (request: Request): Promise<Response> => {
         break;
       case 'generate_artifact':
         result = await handleGenerateArtifact(db, openrouter, session, body);
+        break;
+      case 'export':
+        result = await handleExport(db, body);
         break;
       default:
         result = { success: false, error: `Unknown action: ${body.action}` };
@@ -647,6 +658,38 @@ Format as structured JSON.`;
       content,
     },
   };
+}
+
+// Handle export tools (Google Workspace)
+async function handleExport(
+  db: ReturnType<typeof getDb>,
+  body: TutorRequest
+): Promise<TutorResponse> {
+  if (!body.teacherId) {
+    return { success: false, error: 'Teacher ID required for export' };
+  }
+
+  const toolName = body.context?.tool as string;
+  const toolArgs = body.context?.args as Record<string, unknown> || {};
+
+  if (!toolName || !exportTools[toolName as ExportToolNames]) {
+    return { success: false, error: `Unknown export tool: ${toolName}` };
+  }
+
+  try {
+    const tool = exportTools[toolName as ExportToolNames];
+    const context = { userId: body.teacherId, db: db as any };
+    // Cast to any to handle different tool argument types
+    const result = await tool.execute(toolArgs as any, context);
+
+    return { success: true, data: result };
+  } catch (error) {
+    console.error(`[Tutor] Export tool ${toolName} failed:`, error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Export failed',
+    };
+  }
 }
 
 // Helper functions

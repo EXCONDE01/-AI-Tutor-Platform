@@ -22,7 +22,20 @@ export const artifactTypeEnum = pgEnum('artifact_type', [
 
 export const artifactStatusEnum = pgEnum('artifact_status', ['draft', 'generated', 'reviewed', 'approved', 'published', 'archived']);
 export const exportStatusEnum = pgEnum('export_status', ['pending', 'processing', 'completed', 'failed', 'cancelled']);
-export const exportFormatEnum = pgEnum('export_format', ['pdf', 'docx', 'html', 'markdown', 'json', 'csv', 'xlsx', 'google_docs', 'canvas', 'schoology']);
+export const exportFormatEnum = pgEnum('export_format', [
+  'pdf',
+  'docx',
+  'html',
+  'markdown',
+  'json',
+  'csv',
+  'xlsx',
+  'google_docs',
+  'google_forms',
+  'google_slides',
+  'canvas',
+  'schoology',
+]);
 export const oauthProviderEnum = pgEnum('oauth_provider', ['google', 'microsoft', 'canvas', 'schoology', 'blackboard', 'clever', 'classlink']);
 
 // Declare table first to avoid circular reference
@@ -75,7 +88,7 @@ export const generatedArtifacts = generatedArtifactsTable;
 
 export const exportJobs = pgTable('export_jobs', {
   id: uuid('id').defaultRandom().primaryKey(),
-  artifactId: uuid('artifact_id').notNull().references(() => generatedArtifacts.id, { onDelete: 'cascade' }),
+  artifactId: uuid('artifact_id').references(() => generatedArtifacts.id, { onDelete: 'cascade' }),
   requestedBy: uuid('requested_by').notNull().references(() => teachers.id, { onDelete: 'cascade' }),
   format: exportFormatEnum('format').notNull(),
   status: exportStatusEnum('status').default('pending').notNull(),

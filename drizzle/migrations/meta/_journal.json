@@ -64,6 +64,13 @@
       "when": 1794725584961,
       "tag": "0008_curly_callisto",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794744943553,
+      "tag": "0009_worthless_mister_fear",
+      "breakpoints": true
     }
   ]
 }
