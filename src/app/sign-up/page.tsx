@@ -148,7 +148,7 @@ function SignUpContent() {
                 return (
                   <Button
                     key={option.value}
-                    variant={isSelected ? "primary" : "outline"}
+                    variant={isSelected ? "default" : "outline"}
                     onClick={() => setSelectedRole(option.value)}
                     className="w-full py-3 text-left"
                   >
