@@ -1,0 +1,25 @@
+{
+  "cookies": [
+    {
+      "name": "neon-auth.session_token",
+      "value": "2RITIaSOjbWe1uZXtxXhqoOc8HOut2u8.QiNK9NK%2B9%2B6eidW7DoG94qyveTgl46hnzX7Y1vgMiLg%3D",
+      "domain": "localhost",
+      "path": "/",
+      "expires": 1795333145.951664,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "neon-auth.local.session_data",
+      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzZXNzaW9uIjp7ImV4cGlyZXNBdCI6IjIwMjYtMTEtMjJUMDc6Mzk6MDQuMTg0WiIsInRva2VuIjoiMlJJVElhU09qYldlMXVaWHR4WGhxb09jOEhPdXQydTgiLCJjcmVhdGVkQXQiOiIyMDI2LTExLTE1VDA3OjM5OjA0LjE4NFoiLCJ1cGRhdGVkQXQiOiIyMDI2LTExLTE1VDA3OjM5OjA0LjE4NFoiLCJpcEFkZHJlc3MiOiIxMzYuMTU4LjY0LjI0OCIsInVzZXJBZ2VudCI6Ik1vemlsbGEvNS4wIChXaW5kb3dzIE5UIDEwLjA7IFdpbjY0OyB4NjQpIEFwcGxlV2ViS2l0LzUzNy4zNiAoS0hUTUwsIGxpa2UgR2Vja28pIEhlYWRsZXNzQ2hyb21lLzE1OS4wLjgxNTQuNiBTYWZhcmkvNTM3LjM2IiwidXNlcklkIjoiYTZlNWVjMzctMTMxNC00ODZiLWFlNDktY2Y5MTdiNzIxYWY5IiwiaW1wZXJzb25hdGVkQnkiOm51bGwsImFjdGl2ZU9yZ2FuaXphdGlvbklkIjpudWxsLCJpZCI6IjNhYmE5ODhlLTc0YzktNDRjZi1iMzc5LTVhOTQzMzgyY2E5NSJ9LCJ1c2VyIjp7Im5hbWUiOiJDaHJpc3RpYW4gQW5qZWxvIEEuIEV4Y29uZGUiLCJlbWFpbCI6ImNocmlzdGlhbmV4Y29uZGUwMUBnbWFpbC5jb20iLCJlbWFpbFZlcmlmaWVkIjpmYWxzZSwiaW1hZ2UiOm51bGwsImNyZWF0ZWRBdCI6IjIwMjYtMTEtMTRUMTQ6MjU6MTAuNzg2WiIsInVwZGF0ZWRBdCI6IjIwMjYtMTEtMTRUMTQ6MjU6MTAuNzg2WiIsInJvbGUiOiJ1c2VyIiwiYmFubmVkIjpmYWxzZSwiYmFuUmVhc29uIjpudWxsLCJiYW5FeHBpcmVzIjpudWxsLCJpZCI6ImE2ZTVlYzM3LTEzMTQtNDg2Yi1hZTQ5LWNmOTE3YjcyMWFmOSJ9LCJpYXQiOjE3OTQ3MjgzNDUsImV4cCI6MTc5NDcyOTI0NSwic3ViIjoiYTZlNWVjMzctMTMxNC00ODZiLWFlNDktY2Y5MTdiNzIxYWY5In0.llyEnxBo1sL4Wm0ZPnpZNyKGAs8MsNoR0SJiz0jKi34",
+      "domain": "localhost",
+      "path": "/",
+      "expires": 1794729244.952329,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": []
+}

@@ -1,0 +1,1 @@
+ALTER TYPE "public"."audit_resource_type" ADD VALUE 'lti_launch' BEFORE 'nrps_cache';

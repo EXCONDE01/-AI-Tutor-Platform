@@ -1,0 +1,147 @@
+name: CD (Production Deploy)
+
+on:
+  push:
+    branches: [main]
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  deploy-neon-functions:
+    name: Deploy Neon Functions
+    runs-on: ubuntu-latest
+    env:
+      NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Neon CLI
+        run: npm install -g neonctl@latest
+
+      - name: Authenticate with Neon
+        run: neonctl auth --api-key ${{ secrets.NEON_API_KEY }}
+
+      - name: Get main branch ID
+        id: main-branch
+        run: |
+          BRANCH_ID=$(neonctl branches list --project-id $NEON_PROJECT_ID --output json | jq -r '.[] | select(.name == "main") | .id')
+          echo "branch_id=$BRANCH_ID" >> $GITHUB_OUTPUT
+
+      - name: Create env file for function deployment
+        run: |
+          cat > .env.production << 'EOF'
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
+          NODE_ENV=production
+          OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}
+          EOF
+
+      - name: Deploy tutor function to main branch
+        run: |
+          neonctl functions deploy tutor \
+            --project-id $NEON_PROJECT_ID \
+            --branch-id ${{ steps.main-branch.outputs.branch_id }} \
+            --source src/functions/tutor.ts \
+            --env-file .env.production \
+            --output json
+
+      - name: Deploy chat function to main branch
+        run: |
+          neonctl functions deploy chat \
+            --project-id $NEON_PROJECT_ID \
+            --branch-id ${{ steps.main-branch.outputs.branch_id }} \
+            --source src/functions/chat.ts \
+            --env-file .env.production \
+            --output json
+
+  deploy-vercel-production:
+    name: Promote Vercel Preview to Production
+    runs-on: ubuntu-latest
+    needs: deploy-neon-functions
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Create production environment file
+        run: |
+          cat > .env.production << 'EOF'
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
+          NODE_ENV=production
+          OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}
+          BETTER_AUTH_SECRET=${{ secrets.BETTER_AUTH_SECRET }}
+          BETTER_AUTH_URL=${{ secrets.NEXT_PUBLIC_APP_URL }}
+          NEXT_PUBLIC_APP_URL=${{ secrets.NEXT_PUBLIC_APP_URL }}
+          NEON_TUTOR_FUNCTION_URL=${{ secrets.NEON_TUTOR_FUNCTION_URL }}
+          NEON_CHAT_FUNCTION_URL=${{ secrets.NEON_CHAT_FUNCTION_URL }}
+          EOF
+
+      - name: Deploy to Vercel Production
+        run: |
+          vercel deploy \
+            --token=${{ secrets.VERCEL_TOKEN }} \
+            --scope=${{ secrets.VERCEL_ORG_ID }} \
+            --prod=true \
+            --env-file=.env.production \
+            --yes
+
+  smoke-test:
+    name: Smoke Tests (Production)
+    runs-on: ubuntu-latest
+    needs: deploy-vercel-production
+    env:
+      PRODUCTION_URL: ${{ secrets.NEXT_PUBLIC_APP_URL }}
+      NEON_TUTOR_FUNCTION_URL: ${{ secrets.NEON_TUTOR_FUNCTION_URL }}
+      NEON_CHAT_FUNCTION_URL: ${{ secrets.NEON_CHAT_FUNCTION_URL }}
+    steps:
+      - name: Wait for deployment to settle
+        run: sleep 30
+
+      - name: Test production health endpoint
+        run: |
+          curl -f "${{ env.PRODUCTION_URL }}/api/health" || exit 1
+
+      - name: Test Neon tutor function health
+        run: |
+          curl -f "${{ env.NEON_TUTOR_FUNCTION_URL }}/health" || exit 1
+
+      - name: Test Neon chat function health
+        run: |
+          curl -f "${{ env.NEON_CHAT_FUNCTION_URL }}/health" || exit 1
+
+      - name: Test chat endpoint (non-streaming)
+        run: |
+          curl -X POST "${{ env.NEON_CHAT_FUNCTION_URL }}" \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -d '{"action":"chat","sessionId":"test-session","message":"Hello"}' \
+            -f || exit 1
+
+      - name: Test chat endpoint (streaming SSE)
+        run: |
+          curl -X POST "${{ env.NEON_CHAT_FUNCTION_URL }}" \
+            -H "Content-Type: application/json" \
+            -H "Accept: text/event-stream" \
+            -d '{"action":"chat","sessionId":"test-session","message":"Hello","stream":true}' \
+            -f --no-buffer || exit 1
+
+      - name: Report success
+        run: echo "✅ All smoke tests passed"

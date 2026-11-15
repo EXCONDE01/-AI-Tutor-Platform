@@ -1,0 +1,309 @@
+# Preview Deployment Workflow
+# 
+# This workflow handles branch-per-teacher deployments for the AI Tutor Platform.
+# On PR: Creates Neon branch, deploys Neon Function, deploys Next.js to Vercel Preview
+# On close: Cleans up Neon branch (TTL also handles this automatically)
+#
+# Required secrets (configure in GitHub repo settings):
+# - NEON_API_KEY: Neon API key with project access
+# - NEON_PROJECT_ID: Neon project ID
+# - VERCEL_TOKEN: Vercel access token
+# - VERCEL_ORG_ID: Vercel organization ID
+# - VERCEL_PROJECT_ID: Vercel project ID
+# - OPENROUTER_API_KEY: OpenRouter API key for LLM access
+
+name: Preview Deploy
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    branches: [main, staging]
+
+env:
+  # Neon configuration
+  NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+  NEON_BRANCH_PREFIX: pr-
+  
+  # Vercel configuration
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+jobs:
+  # Job to create/update Neon branch and deploy function
+  neon-deploy:
+    name: Deploy to Neon
+    runs-on: ubuntu-latest
+    if: github.event.action != 'closed'
+    outputs:
+      neon_branch: ${{ steps.create-branch.outputs.branch_name }}
+      neon_database_url: ${{ steps.create-branch.outputs.database_url }}
+      neon_function_url: ${{ steps.deploy-function.outputs.function_url }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Neon CLI
+        run: npm install -g neonctl@latest
+
+      - name: Authenticate with Neon
+        run: neonctl auth --api-key ${{ secrets.NEON_API_KEY }}
+
+      - name: Generate branch name
+        id: branch-name
+        run: |
+          BRANCH_NAME="${NEON_BRANCH_PREFIX}${github.event.pull_request.number}"
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+
+      - name: Create or update Neon branch
+        id: create-branch
+        run: |
+          BRANCH_NAME="${{ steps.branch-name.outputs.branch_name }}"
+          
+          # Check if branch already exists
+          EXISTING=$(neonctl branches list --project-id $NEON_PROJECT_ID --output json | jq -r ".[] | select(.name == \"$BRANCH_NAME\") | .id")
+          
+          if [ -n "$EXISTING" ]; then
+            echo "Branch $BRANCH_NAME already exists (ID: $EXISTING), resetting from parent..."
+            neonctl branches reset $EXISTING --project-id $NEON_PROJECT_ID --parent main
+            BRANCH_ID=$EXISTING
+          else
+            echo "Creating new branch $BRANCH_NAME from main..."
+            RESULT=$(neonctl branches create $BRANCH_NAME --project-id $NEON_PROJECT_ID --parent main --output json)
+            BRANCH_ID=$(echo $RESULT | jq -r '.id')
+          fi
+          
+          # Get connection string for the branch
+          CONNECTION_STRING=$(neonctl connection-string $BRANCH_ID --project-id $NEON_PROJECT_ID --role neon_admin --pooler transaction)
+          
+          echo "branch_id=$BRANCH_ID" >> $GITHUB_OUTPUT
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+          echo "database_url=$CONNECTION_STRING" >> $GITHUB_OUTPUT
+
+      - name: Run database migrations on preview branch
+        run: |
+          export DATABASE_URL="${{ steps.create-branch.outputs.database_url }}"
+          npm run db:migrate
+
+      - name: Build and deploy Neon Function
+        id: deploy-function
+        run: |
+          BRANCH_ID="${{ steps.create-branch.outputs.branch_id }}"
+          
+          # Create .env.preview for function deployment
+          cat > .env.preview << 'EOF'
+          DATABASE_URL=${{ steps.create-branch.outputs.database_url }}
+          NODE_ENV=production
+          OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}
+          # Add other required env vars here
+          EOF
+          
+          # Deploy function to the Neon branch
+          # Note: neonctl functions deploy requires the function source to be in the repo
+          neonctl functions deploy tutor \
+            --project-id $NEON_PROJECT_ID \
+            --branch-id $BRANCH_ID \
+            --source src/functions/tutor.ts \
+            --env-file .env.preview \
+            --output json > function_deploy_result.json
+          
+          FUNCTION_URL=$(cat function_deploy_result.json | jq -r '.url')
+          echo "function_url=$FUNCTION_URL" >> $GITHUB_OUTPUT
+
+      - name: Comment PR with Neon info
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { neon_branch, neon_function_url } = ${{ toJson(steps.create-branch.outputs) }};
+            
+            const body = `## 🌿 Neon Preview Deployment
+            
+            **Branch:** \`${neon_branch}\`
+            **Database:** Connected and migrated
+            **Function:** [Tutor Agent](${neon_function_url})
+            
+            This preview environment will auto-expire in 7 days (TTL).
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+
+  # Job to deploy Next.js to Vercel Preview
+  vercel-deploy:
+    name: Deploy to Vercel Preview
+    runs-on: ubuntu-latest
+    if: github.event.action != 'closed'
+    needs: neon-deploy
+    outputs:
+      preview_url: ${{ steps.deploy-preview.outputs.preview_url }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Create Vercel environment file
+        run: |
+          cat > .env.preview << 'EOF'
+          # Database (from Neon preview branch)
+          DATABASE_URL=${{ needs.neon-deploy.outputs.neon_database_url }}
+          
+          # Neon Function URL
+          NEON_TUTOR_FUNCTION_URL=${{ needs.neon-deploy.outputs.neon_function_url }}
+          
+          # Auth
+          BETTER_AUTH_SECRET=${{ secrets.BETTER_AUTH_SECRET }}
+          BETTER_AUTH_URL=https://${{ needs.neon-deploy.outputs.neon_branch }}.vercel.app
+          
+          # OpenRouter (for LLM)
+          OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}
+          
+          # App
+          NEXT_PUBLIC_APP_URL=https://${{ needs.neon-deploy.outputs.neon_branch }}.vercel.app
+          NODE_ENV=production
+          EOF
+
+      - name: Deploy to Vercel Preview
+        id: deploy-preview
+        run: |
+          # Deploy to Vercel with preview branch environment
+          vercel deploy \
+            --token=${{ secrets.VERCEL_TOKEN }} \
+            --scope=${{ secrets.VERCEL_ORG_ID }} \
+            --prod=false \
+            --env-file=.env.preview \
+            --yes \
+            --output=json > vercel_deploy_result.json
+          
+          PREVIEW_URL=$(cat vercel_deploy_result.json | jq -r '.url')
+          echo "preview_url=$PREVIEW_URL" >> $GITHUB_OUTPUT
+
+      - name: Comment PR with Vercel Preview URL
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const preview_url = "${{ steps.deploy-preview.outputs.preview_url }}";
+            
+            const body = `## 🚀 Vercel Preview Deployment
+            
+            **Preview URL:** ${preview_url}
+            **Neon Branch:** \`${{ needs.neon-deploy.outputs.neon_branch }}\`
+            **Function:** \`${{ needs.neon-deploy.outputs.neon_function_url }}\`
+            
+            This preview is automatically updated on each push to the PR.
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+
+  # Job to clean up Neon branch on PR close
+  neon-cleanup:
+    name: Cleanup Neon Branch
+    runs-on: ubuntu-latest
+    if: github.event.action == 'closed'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Neon CLI
+        run: npm install -g neonctl@latest
+
+      - name: Authenticate with Neon
+        run: neonctl auth --api-key ${{ secrets.NEON_API_KEY }}
+
+      - name: Generate branch name
+        id: branch-name
+        run: |
+          BRANCH_NAME="${NEON_BRANCH_PREFIX}${github.event.pull_request.number}"
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+
+      - name: Delete Neon branch
+        run: |
+          BRANCH_NAME="${{ steps.branch-name.outputs.branch_name }}"
+          
+          # Find branch ID
+          BRANCH_ID=$(neonctl branches list --project-id $NEON_PROJECT_ID --output json | jq -r ".[] | select(.name == \"$BRANCH_NAME\") | .id")
+          
+          if [ -n "$BRANCH_ID" ] && [ "$BRANCH_ID" != "null" ]; then
+            echo "Deleting Neon branch $BRANCH_NAME (ID: $BRANCH_ID)..."
+            neonctl branches delete $BRANCH_ID --project-id $NEON_PROJECT_ID
+            echo "Branch deleted successfully"
+          else
+            echo "Branch $BRANCH_NAME not found (may have been auto-deleted by TTL)"
+          fi
+
+      - name: Comment PR with cleanup confirmation
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = `## 🧹 Preview Environment Cleaned Up
+            
+            The Neon preview branch \`pr-${{ github.event.pull_request.number }}\` has been deleted.
+            Vercel preview deployment will expire automatically.
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+
+  # Summary job that runs after all deployments
+  summary:
+    name: Deployment Summary
+    runs-on: ubuntu-latest
+    if: github.event.action != 'closed'
+    needs: [neon-deploy, vercel-deploy]
+    steps:
+      - name: Post final summary comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const preview_url = "${{ needs.vercel-deploy.outputs.preview_url }}";
+            const neon_branch = "${{ needs.neon-deploy.outputs.neon_branch }}";
+            const function_url = "${{ needs.neon-deploy.outputs.neon_function_url }}";
+            
+            const body = `## ✅ Preview Deployment Complete
+            
+            | Service | Status | URL |
+            |---------|--------|-----|
+            | **Neon Branch** | ✅ Ready | \`${neon_branch}\` |
+            | **Database** | ✅ Migrated | Connected |
+            | **Neon Function (Tutor)** | ✅ Deployed | [${function_url}](${function_url}) |
+            | **Vercel Preview** | ✅ Live | [${preview_url}](${preview_url}) |
+            
+            ---
+            
+            **Branch TTL:** 7 days (auto-cleanup)
+            **Compute:** Minimal (preview tier)
+            
+            > 💡 This environment is perfect for testing teacher workflows, LTI launches, and tutor interactions.
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });

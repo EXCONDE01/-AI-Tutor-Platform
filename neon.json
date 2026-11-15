@@ -1,0 +1,18 @@
+{
+  "$schema": "https://neon.tech/schema/neon-config",
+  "functions": {
+    "tutor": "src/functions/tutor.ts",
+    "chat": "src/functions/chat.ts"
+  },
+  "branches": {
+    "main": {
+      "functions": ["tutor", "chat"],
+      "database": {
+        "branch": "main"
+      }
+    }
+  },
+  "database": {
+    "branch": "main"
+  }
+}
