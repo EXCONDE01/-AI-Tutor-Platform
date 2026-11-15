@@ -152,7 +152,7 @@ function SignUpContent() {
           {/* Role Selection */}
           <div className="space-y-3">
             <Label className="text-sm font-medium text-foreground">I am a</Label>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3" role="radiogroup" aria-label="Select your role">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3" role="radiogroup" aria-label="Select your role" style={{ minHeight: '160px' }}>
               {ROLE_OPTIONS.map((option) => {
                 const Icon = option.icon;
                 const isSelected = selectedRole === option.value;
@@ -188,7 +188,7 @@ function SignUpContent() {
                           {option.label}
                         </div>
                         <div className={cn(
-                          "text-xs mt-1 leading-relaxed truncate",
+                          "text-xs mt-1 leading-relaxed",
                           isSelected ? "text-primary/70" : "text-muted-foreground"
                         )}>
                           {option.description}
