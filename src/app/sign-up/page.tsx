@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Mail, Lock, AlertCircle, User, GraduationCap, UserCog, ShieldUser, ChevronRight } from "lucide-react";
+import { Loader2, Mail, Lock, AlertCircle, User, GraduationCap, UserCog, ShieldUser, ChevronRight, Check } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 
@@ -134,7 +134,7 @@ function SignUpContent() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4 py-12">
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-lg">
         <CardHeader className="text-center space-y-2">
           <CardTitle className="text-2xl font-bold tracking-tight">Create an account</CardTitle>
           <CardDescription className="text-muted-foreground">
@@ -149,10 +149,10 @@ function SignUpContent() {
             </Alert>
           )}
 
-          {/* Role Selection */}
+          {/* Role Selection - vertical stack for readability */}
           <div className="space-y-3">
             <Label className="text-sm font-medium text-foreground">I am a</Label>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3" role="radiogroup" aria-label="Select your role" style={{ minHeight: '160px' }}>
+            <div className="space-y-2" role="radiogroup" aria-label="Select your role">
               {ROLE_OPTIONS.map((option) => {
                 const Icon = option.icon;
                 const isSelected = selectedRole === option.value;
@@ -164,39 +164,39 @@ function SignUpContent() {
                     aria-checked={isSelected}
                     onClick={() => handleRoleSelect(option.value)}
                     className={cn(
-                      "relative p-4 text-left transition-all duration-200 rounded-xl border-2",
+                      "relative w-full p-4 text-left transition-all duration-200 rounded-xl border-2",
                       isSelected
                         ? "border-primary bg-primary/5 shadow-[0_0_0_1px_rgba(var(--primary),0.1)]"
                         : "border-border hover:border-primary/50 hover:bg-accent/30",
                       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                     )}
                   >
-                    <div className="flex items-start gap-3">
+                    <div className="flex items-center gap-4">
                       <div
                         className={cn(
-                          "flex h-10 w-10 items-center justify-center rounded-lg transition-colors",
+                          "flex-shrink-0 h-12 w-12 items-center justify-center rounded-lg transition-colors",
                           isSelected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
                         )}
                       >
-                        <Icon className="h-5 w-5" aria-hidden="true" />
+                        <Icon className="h-6 w-6" aria-hidden="true" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className={cn(
-                          "font-medium text-sm leading-tight",
+                          "font-medium text-base leading-tight",
                           isSelected ? "text-primary" : "text-foreground"
                         )}>
                           {option.label}
                         </div>
                         <div className={cn(
-                          "text-xs mt-1 leading-relaxed",
-                          isSelected ? "text-primary/70" : "text-muted-foreground"
+                          "text-sm mt-1.5 leading-relaxed",
+                          isSelected ? "text-primary/80" : "text-muted-foreground"
                         )}>
                           {option.description}
                         </div>
                       </div>
                       {isSelected && (
                         <div className="flex-shrink-0 text-primary">
-                          <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                          <Check className="h-5 w-5" aria-hidden="true" />
                         </div>
                       )}
                     </div>
