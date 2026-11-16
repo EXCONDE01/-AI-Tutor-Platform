@@ -50,13 +50,12 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Install PostgreSQL client
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
-
       - name: Wait for PostgreSQL
         run: |
+          echo "Waiting for PostgreSQL service to be healthy..."
           for i in {1..30}; do
-            if pg_isready -h localhost -p 5432 -U postgres; then
+            # Try to connect using node (available in PATH)
+            if node -e "const net = require('net'); const client = new net.Socket(); client.setTimeout(1000); client.connect(5432, 'localhost', () => { client.destroy(); process.exit(0); }); client.on('error', () => process.exit(1)); client.on('timeout', () => process.exit(1));" 2>/dev/null; then
               echo "PostgreSQL is ready"
               break
             fi
@@ -64,11 +63,11 @@ jobs:
             sleep 2
           done
 
-      - name: Run database migrations
-        run: npm run db:migrate
-
       - name: Install dependencies
         run: npm ci
+
+      - name: Run database migrations
+        run: npm run db:migrate
 
       - name: Build web assets
         run: npm run build
