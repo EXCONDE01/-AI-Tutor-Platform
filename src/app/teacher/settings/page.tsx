@@ -95,7 +95,9 @@ export default function TeacherSettingsPage() {
     setError(null);
     setSuccess(null);
     try {
+      console.log('[LinkGoogle] Calling linkOAuthAccount...');
       const result = await linkOAuthAccount('google');
+      console.log('[LinkGoogle] Result:', result);
       if (result.error) {
         // If linking fails due to account already linked, that's actually success
         if (result.error.message?.includes('already linked') || result.error.message?.includes('ALREADY_LINKED')) {
@@ -106,12 +108,15 @@ export default function TeacherSettingsPage() {
         }
       } else if (result.data?.url) {
         // Redirect user to Google OAuth for linking
+        console.log('[LinkGoogle] Redirecting to:', result.data.url);
         window.location.href = result.data.url;
       } else {
+        console.log('[LinkGoogle] No URL in result, data:', result.data);
         setSuccess("Google account linked successfully! You can now sign in with Google.");
         setGoogleConnected(true);
       }
     } catch (err) {
+      console.error('[LinkGoogle] Error:', err);
       const message = err instanceof Error ? err.message : String(err);
       if (message.includes('already linked') || message.includes('ALREADY_LINKED')) {
         setSuccess("Google account already linked!");
