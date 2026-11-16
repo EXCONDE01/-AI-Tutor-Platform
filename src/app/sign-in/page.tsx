@@ -21,7 +21,13 @@ function SignInContent() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(error);
+  const [errorMessage, setErrorMessage] = useState<string | null>(() => {
+    // Handle specific error from OAuth callback
+    if (error === "account_not_linked" || error === "ACCOUNT_NOT_LINKED") {
+      return "This email is already registered. Please sign in with your email and password, then link your Google account in Settings.";
+    }
+    return error;
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

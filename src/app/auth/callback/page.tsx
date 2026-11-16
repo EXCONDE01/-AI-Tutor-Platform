@@ -4,7 +4,6 @@ import * as React from "react";
 import { useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 function AuthCallbackContent() {
   const router = useRouter();
@@ -17,6 +16,7 @@ function AuthCallbackContent() {
     const handleCallback = async () => {
       if (error) {
         console.error('[AuthCallback] OAuth error:', error);
+        // Redirect to sign-in page with error - it will handle display
         router.push(`/sign-in?error=${encodeURIComponent(error)}`);
         return;
       }
