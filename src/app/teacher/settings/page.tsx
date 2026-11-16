@@ -61,6 +61,15 @@ export default function TeacherSettingsPage() {
       setError(`Connection failed: ${params.get("google_error")}`);
       window.history.replaceState({}, "", "/teacher/settings");
     }
+    if (params.get("link_error")) {
+      setError(params.get("link_error") || "Failed to link Google account");
+      window.history.replaceState({}, "", "/teacher/settings");
+    }
+    if (params.get("linked") === "google") {
+      setSuccess("Google account linked successfully! You can now sign in with Google.");
+      setGoogleConnected(true);
+      window.history.replaceState({}, "", "/teacher/settings");
+    }
   }, []);
 
   const handleConnectGoogle = () => {

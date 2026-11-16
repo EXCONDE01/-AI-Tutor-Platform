@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertCircle, RefreshCw } from "lucide-react";
 
 function AuthCallbackContent() {
   const router = useRouter();
@@ -11,13 +11,29 @@ function AuthCallbackContent() {
   const callbackUrl = searchParams.get("callbackUrl") || "/";
   const mode = searchParams.get("mode") || "signin"; // "signin" | "signup" | "link"
   const error = searchParams.get("error");
+  const errorDescription = searchParams.get("error_description");
 
   useEffect(() => {
     const handleCallback = async () => {
       if (error) {
-        console.error('[AuthCallback] OAuth error:', error);
-        // Redirect to sign-in page with error - it will handle display
-        router.push(`/sign-in?error=${encodeURIComponent(error)}`);
+        console.error('[AuthCallback] OAuth error:', error, errorDescription);
+        
+        // Handle specific Better Auth errors
+        let userMessage = errorDescription || error;
+        
+        if (error === "access_denied" || errorDescription?.includes("already linked") || errorDescription?.includes("different user")) {
+          userMessage = "This Google account is already linked to another account. Please sign in with that account, or contact support to unlink it.";
+        } else if (error === "account_not_linked" || error === "ACCOUNT_NOT_LINKED") {
+          userMessage = "This email is already registered. Please sign in with your email and password, then link your Google account in Settings.";
+        }
+        
+        if (mode === "link") {
+          // For link mode, redirect back to settings with error
+          router.push(`/teacher/settings?link_error=${encodeURIComponent(userMessage)}`);
+        } else {
+          // For signin/signup, redirect to sign-in with error
+          router.push(`/sign-in?error=${encodeURIComponent(userMessage)}`);
+        }
         return;
       }
 
@@ -76,7 +92,7 @@ function AuthCallbackContent() {
     };
 
     handleCallback();
-  }, [router, callbackUrl, mode, error]);
+  }, [router, callbackUrl, mode, error, errorDescription]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
