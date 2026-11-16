@@ -49,7 +49,9 @@ function AuthCallbackContent() {
         if (roleResponse.ok) {
           const { role } = await roleResponse.json();
           
-          // Handle "link" mode - just redirect back to settings
+          // Handle "link" mode FIRST - before role-based redirects
+          // In link mode, the session may belong to a different user (the one Google was linked to)
+          // We just need to redirect back to settings where the original user is logged in
           if (mode === "link") {
             router.push("/teacher/settings?linked=google");
             router.refresh();
