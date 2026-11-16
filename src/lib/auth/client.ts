@@ -118,12 +118,21 @@ export async function deleteAccountClient(password: string) {
  */
 export async function linkOAuthAccount(provider: 'google' | 'github' | 'microsoft') {
   console.log('[linkOAuthAccount] Calling /link-social with provider:', provider);
-  const result = await authClient.$fetch('/link-social', {
+  // Use direct fetch to Neon Auth base URL since the client might not have the method
+  const baseUrl = typeof window !== 'undefined' 
+    ? window.location.origin + '/api/auth' 
+    : process.env.NEON_AUTH_BASE_URL || 'http://localhost:3000/api/auth';
+  
+  const result = await fetch(`${baseUrl}/link-social`, {
     method: 'POST',
-    body: { provider, callbackURL: '/' },
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ provider, callbackURL: '/' }),
   });
-  console.log('[linkOAuthAccount] Result:', result);
-  return result as unknown as { data?: { url: string; redirect: boolean }; error?: { message: string } };
+  
+  const data = await result.json().catch(() => ({}));
+  console.log('[linkOAuthAccount] Result:', data);
+  return data as { data?: { url: string; redirect: boolean }; error?: { message: string } };
 }
 
 /**
