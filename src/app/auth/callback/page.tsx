@@ -3,40 +3,30 @@
 import * as React from "react";
 import { useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Loader2, AlertCircle, RefreshCw } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 function AuthCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/";
-  const mode = searchParams.get("mode") || "signin"; // "signin" | "signup" | "link"
+  const mode = searchParams.get("mode") || "signin"; // "signin" | "signup"
   const error = searchParams.get("error");
   const errorDescription = searchParams.get("error_description");
 
   useEffect(() => {
     const handleCallback = async () => {
-      console.log('[AuthCallback] Mode:', mode, 'Error:', error, 'ErrorDesc:', errorDescription);
-      console.log('[AuthCallback] Full search params:', Array.from(searchParams.entries()));
-      
       if (error) {
         console.error('[AuthCallback] OAuth error:', error, errorDescription);
         
         // Handle specific Better Auth errors
         let userMessage = errorDescription || error;
         
-        if (error === "access_denied" || errorDescription?.includes("already linked") || errorDescription?.includes("different user")) {
-          userMessage = "This Google account is already linked to another account. Please sign in with that account, or contact support to unlink it.";
-        } else if (error === "account_not_linked" || error === "ACCOUNT_NOT_LINKED") {
+        if (error === "account_not_linked" || error === "ACCOUNT_NOT_LINKED") {
           userMessage = "This email is already registered. Please sign in with your email and password, then link your Google account in Settings.";
         }
         
-        if (mode === "link") {
-          // For link mode, redirect back to settings with error
-          router.push(`/teacher/settings?link_error=${encodeURIComponent(userMessage)}`);
-        } else {
-          // For signin/signup, redirect to sign-in with error
-          router.push(`/sign-in?error=${encodeURIComponent(userMessage)}`);
-        }
+        // For signin/signup, redirect to sign-in with error
+        router.push(`/sign-in?error=${encodeURIComponent(userMessage)}`);
         return;
       }
 
@@ -51,17 +41,6 @@ function AuthCallbackContent() {
 
         if (roleResponse.ok) {
           const { role } = await roleResponse.json();
-          console.log('[AuthCallback] Role from API:', role);
-          
-          // Handle "link" mode FIRST - before role-based redirects
-          // In link mode, the session may belong to a different user (the one Google was linked to)
-          // We just need to redirect back to settings where the original user is logged in
-          if (mode === "link") {
-            console.log('[AuthCallback] Link mode - redirecting to settings');
-            router.push("/teacher/settings?linked=google");
-            router.refresh();
-            return;
-          }
           
           if (mode === "signup" && role === "student") {
             // New user from sign-up flow - redirect to role selection/onboarding
