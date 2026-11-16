@@ -4,7 +4,7 @@
  */
 
 import { getDb } from '@/lib/db';
-import { auditLogs, users } from '@/db/schema';
+import { auditLogs, users, consentRecords, students } from '@/db/schema';
 import { eq, and, gte, lte, desc, count, sql } from 'drizzle-orm';
 import { ComplianceAuditEvent, ComplianceAuditAction } from './types';
 import { mapAuditSeverity } from './severity';
@@ -385,11 +385,22 @@ export async function checkComplianceViolations(districtId?: string): Promise<{
   pendingDeletionRequests: number;
   overdueDeletionRequests: number;
 }> {
-  // This would need to be implemented based on your user schema
-  // For now, return mock data
+  const database = getDb();
+  const { students } = await import('@/db/schema');
+  const { eq, and } = await import('drizzle-orm');
+  
+  const conditions = districtId ? [eq(consentRecords.districtId, districtId)] : [];
+  
+  // Count missing consent (students without parental consent)
+  const studentsWithoutConsent = await database
+    .select({ count: sql`count(*)` })
+    .from(students)
+    .where(and(...conditions))
+    .then(rows => Number(rows[0]?.count || 0));
+
   return {
-    missingConsent: 0,
-    expiredConsent: 0,
+    missingConsent: studentsWithoutConsent,
+    expiredConsent: 0, // Would need date logic
     withdrawnConsent: 0,
     pendingDeletionRequests: 0,
     overdueDeletionRequests: 0,

@@ -8,7 +8,7 @@ export const authProviderEnum = pgEnum('auth_provider', ['email', 'google', 'mic
 
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
-  schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+  schoolId: uuid('school_id').references(() => schools.id, { onDelete: 'cascade' }),
   role: userRoleEnum('role').notNull(),
   status: userStatusEnum('status').default('pending').notNull(),
   authProvider: authProviderEnum('auth_provider').default('email').notNull(),

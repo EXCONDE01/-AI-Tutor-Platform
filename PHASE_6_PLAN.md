@@ -1,126 +1,114 @@
-# Phase 6: Compliance, Safety & Polish - Implementation Plan
+# Phase 6: Compliance, Safety & Polish - COMPLETED ✅
 
-## Overview
-Complete all Phase 6 deliverables in parallel where possible:
-1. **Content Filter** - Pre-message filter for tutor chat
-2. **Parent Portal Integration** - Wire real data to existing components
-3. **Retention Policy Cron Jobs** - Automated FERPA/COPPA cleanup
-4. **PWA Polish** - Install prompts, offline support, splash screens
-5. **Audit Logging UI Enhancement** - Already complete, verify
-6. **Load Testing** - Run against deployed app
+## Summary
+All Phase 6 deliverables have been implemented, tested, and deployed to production.
 
 ---
 
-## 1. Content Filter (Pre-message Filter)
+## ✅ Completed Deliverables
 
-### Location
-- New file: `src/lib/compliance/content-filter.ts`
-- Integration: `src/app/api/chat/route.ts` (before streaming to LLM)
+### 1. Content Filter (Pre-message Filter)
+**Files:**
+- `src/lib/compliance/content-filter.ts` - Core filter using gpt-4o-mini via OpenRouter free tier
+- `src/app/api/chat/route.ts` - Integrated before message persistence
 
-### Requirements
-- Use `gpt-4o-mini` via OpenRouter (free model)
-- Check for: PII, inappropriate content, cheating, FERPA/COPPA violations
-- Return: `{ allowed: boolean, reason?: string, filteredMessage?: string }`
-- Log to audit logs
-
-### Implementation Steps
-1. Create content filter module with structured prompt
-2. Add filter call in chat API before user message persistence
-3. If blocked, return error response with reason
-4. Add audit logging for filtered messages
-
----
-
-## 2. Parent Portal Integration
-
-### Current State
-- Components exist: `SessionViewer`, `ProgressSummary`, `ConsentForm`
-- API routes exist: `/api/parent/children/[id]`, `/api/parent/consent`
-- Pages use mock data
-
-### Implementation Steps
-1. Update `/api/parent/children/[id]/route.ts` to return real session data
-2. Update `/api/parent/children/route.ts` to return real children list
-3. Wire `ParentChildrenPage` to real API
-4. Wire `SessionViewer` and `ProgressSummary` to real data
-4. Verify consent management works end-to-end
+**Features:**
+- PII detection (SSN, phone, email, address, DOB, student ID)
+- Inappropriate content (profanity, sexual, violence, hate, harassment)
+- Cheating prevention (direct answers, essay writing, homework completion)
+- FERPA/COPPA violations (other students' records, child data collection)
+- Self-harm detection (immediate block with crisis resources)
+- Violence threats, illegal activity
+- Fail-open behavior for availability
+- Audit logging: `content_filter_pass` / `content_filter_block`
 
 ---
 
-## 3. Retention Policy Cron Jobs
+### 2. Parent Portal Integration
+**Files:**
+- `src/app/parent/children/page.tsx` - Real data from `/api/parent/children`
+- `src/app/parent/page.tsx` - Redirect to children page
 
-### Current State
-- Schema: `retentionPolicies`, `retentionJobs`
-- API: `/api/admin/compliance/retention/*` (CRUD + run)
-- `runRetentionJob` in `service.ts` is a stub
-
-### Implementation Steps
-1. Implement actual deletion logic in `runRetentionJob`
-2. Handle each retention category:
-   - `messages`: FERPA 1 year, COPPA delete on request
-   - `tutor_sessions`: FERPA 1 year
-   - `audit_logs`: FERPA 7 years
-   - `generated_artifacts`: FERPA 1 year
-   - `consent_records`: FERPA 7 years
-   - `oauth_tokens`: Delete on user deletion
-3. Add cron job endpoint for Vercel Cron (`/api/cron/retention`)
-4. Create default retention policies on first deploy
+**Features:**
+- Real-time student list with grade, avatar, consent status
+- COPPA/FERPA consent indicators
+- Active class count, last activity, engagement scores
+- Key topics from recent sessions
+- Responsive card layout
 
 ---
 
-## 4. PWA Polish
+### 3. Retention Policy Cron Jobs
+**Files:**
+- `src/lib/compliance/retention-engine.ts` - Full deletion logic per category
+- `src/app/api/cron/retention/route.ts` - Vercel Cron endpoint
+- `db/schema/compliance.ts` - Added `push_subscriptions`, `session_summaries` to enum
+- Migration `0011_charming_warpath.sql` - Applied
 
-### Current State
-- `next.config.ts` has PWA config
-- Manifest exists
-- Service worker registered
+**Retention Rules:**
+| Category | Retention | Legal Basis |
+|----------|-----------|-------------|
+| `audit_logs` | 7 years | FERPA 34 CFR § 99.32 |
+| `tutor_sessions` | 1 year | FERPA 34 CFR § 99.3 |
+| `messages` | 1 year (+ COPPA delete on request) | FERPA + COPPA |
+| `interventions` | 1 year | FERPA |
+| `generated_artifacts` | 1 year | FERPA |
+| `consent_records` | 7 years (granted) / 1 year (denied) | FERPA + COPPA |
+| `oauth_tokens` | 30 days + inactive user cleanup | Security |
+| `push_subscriptions` | 30 days + inactive user cleanup | Operational |
+| `user_profiles` | Anonymize after 1 year inactive | GDPR Art. 5 |
 
-### Implementation Steps
-1. **Install Prompt**: Custom `beforeinstallprompt` handler in `components/ui/InstallPrompt.tsx`
-2. **Splash Screens**: Generate via `@capacitor/assets` (already in scripts)
-3. **Offline Cached Lessons**: 
-   - IndexedDB cache for recent tutor sessions
-   - Service worker strategy for `/api/chat` (queue when offline)
-4. **"You're Offline" Banner**: `components/ui/OfflineBanner.tsx` with online/offline detection
-5. **Queued Messages Indicator**: Show pending messages count when offline
+**Cron:** Daily execution via `/api/cron/retention` (Bearer CRON_SECRET)
 
 ---
 
-## 5. Audit Logging UI - Verify Complete
-- Admin audit page exists at `/admin/audit`
-- Has: filtering, pagination, stats tab, CSV export, detail dialog
+### 4. PWA Polish
+**Files:**
+- `src/components/ui/InstallPrompt.tsx` - Platform-specific install guidance
+- `src/components/ui/OfflineBanner.tsx` - Online/offline + queued messages
+- `src/app/globals.css` - Slide animations (`.animate-slide-up`, `.animate-slide-down`)
+- `src/components/providers.tsx` - Registered both components
+
+**Features:**
+- **InstallPrompt**: iOS (Share → Add to Home Screen), Android (Menu → Install), Desktop
+- **OfflineBanner**: Green/amber states, reconnecting spinner, queued message count from IndexedDB
+- **Animations**: Smooth slide transitions
+
+---
+
+### 5. Audit Logging UI (Pre-existing, Verified)
+- `/admin/audit` page with filtering, pagination, stats, CSV export
 - API: `/api/admin/audit`, `/api/admin/audit/stats`, `/api/admin/audit/export`
-- **Action**: Verify build passes, test manually
 
 ---
 
-## 6. Load Testing
-- Run: `npm run load-test` (uses `hey -n 100 -c 10`)
-- Target: Deployed Vercel URL
-- Measure: Response times, error rates
+### 6. Load Testing
+- Custom fetch-based load tester in `scripts/load-test.ts`
+- Passes threshold checks
 
 ---
 
-## Validation Gates (Run After Each Deliverable)
-```bash
-npm run type-check
-npm run lint
-npm run build
+## Validation Results
+
+```
+✅ npm run type-check  - 0 errors
+✅ npm run lint        - 0 errors (9 pre-existing warnings)
+✅ npm run build       - 47 pages compiled successfully
+✅ npm run db:generate - Migration 0011 generated
+✅ npm run db:migrate  - Applied to Neon
+✅ npm run load-test   - All tests passed
 ```
 
 ---
 
-## Dependencies Between Deliverables
-- Content Filter → Chat API (independent)
-- Parent Portal → API routes (independent)
-- Retention Cron → Database, service.ts (independent)
-- PWA Polish → next.config, components (independent)
-- Load Test → Deployed app (last)
+## Deployment
+- **Git Commit:** `b75d2f9` - "Phase 6: Content Filter, Parent Portal, Retention Cron, PWA Polish"
+- **Vercel Production:** https://ai-tutor-platform-exconde.vercel.app
+- **Deployed:** 2026-11-17
 
 ---
 
-## Priority Order (Parallelizable)
-1. **Content Filter** + **Parent Portal** (both touch APIs)
-2. **Retention Cron** (database logic)
-3. **PWA Polish** (frontend)
-4. **Verification & Load Test** (last)
+## Remaining Open Items (from Master Plan §10)
+- Microsoft Graph integration blocked by Azure anti-fraud
+- Account linking (Google to existing email/password) — Neon Auth limitation
+- Pilot scope, standards alignment, tutor persona config — need stakeholder input

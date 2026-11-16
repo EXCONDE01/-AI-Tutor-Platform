@@ -8,7 +8,6 @@ import { getSession } from './server';
 import { getDb, type NodePgDatabase } from '@/lib/db';
 import { users, teachers, students, parents } from '@/db/schema';
 import { eq, or } from 'drizzle-orm';
-import { DEMO_SCHOOL_ID } from '@/lib/tenant';
 import type { NextRequest } from 'next/server';
 
 export type AppRole = 'teacher' | 'student' | 'parent' | 'admin';
@@ -194,7 +193,6 @@ export async function ensureAppUser(
       const inserted = await tx
         .insert(users)
         .values({
-          schoolId: DEMO_SCHOOL_ID,
           role,
           status: 'active',
           authProvider: 'email',

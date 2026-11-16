@@ -23,7 +23,7 @@ import {
   tutorSessions,
   type TutorConfig,
 } from '@/db/schema';
-import { DEMO_CLASS_ID, DEMO_TUTOR_CONFIG_ID } from '@/lib/tenant';
+import { DEMO_CLASS_ID } from '@/lib/tenant';
 import { resolveModelChain, streamTutorText } from '@/lib/ai/openrouter';
 import { getRelevantContext } from '@/lib/ai/rag';
 import { generateSessionSummary, storeSessionLearningEmbeddings } from '@/lib/ai/summarize';
@@ -252,7 +252,14 @@ export async function POST(request: NextRequest) {
       }
 
       const classId = enrollment.classId;
-      const tutorConfigId = enrollment.tutorConfigId ?? DEMO_TUTOR_CONFIG_ID;
+      
+      if (!enrollment.tutorConfigId) {
+        return NextResponse.json(
+          { error: 'No tutor configuration found for this class. Please contact your teacher.' },
+          { status: 404 }
+        );
+      }
+      const tutorConfigId = enrollment.tutorConfigId;
 
       const [created] = await database
         .insert(tutorSessions)

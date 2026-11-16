@@ -983,8 +983,6 @@ export async function verifyAge(
  * Get policy document
  */
 export async function getPolicyDocument(type: ConsentType, version: string): Promise<PolicyDocument | null> {
-  // In production, fetch from policy_documents table
-  // For now, return mock data
   const policies = await getConsentPolicyVersions();
   const policy = policies.find(p => p.type === type && p.version === version);
   

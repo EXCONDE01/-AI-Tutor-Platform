@@ -3,11 +3,10 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { ensureAppUser } from '@/lib/auth/provision';
 import { getDb } from '@/lib/db';
-import { students, tutorSessions } from '@/db/schema';
-import { DEMO_CLASS_ID, DEMO_TUTOR_CONFIG_ID } from '@/lib/tenant';
+import { classes, classStudents, students, tutorConfigs, tutorSessions } from '@/db/schema';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -37,12 +36,41 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Student profile not found' }, { status: 409 });
     }
 
+    // Find an active enrollment for this student
+    const [enrollment] = await database
+      .select({
+        classId: classStudents.classId,
+        tutorConfigId: tutorConfigs.id,
+      })
+      .from(classStudents)
+      .innerJoin(classes, eq(classes.id, classStudents.classId))
+      .leftJoin(tutorConfigs, eq(tutorConfigs.classId, classes.id))
+      .where(and(
+        eq(classStudents.studentId, studentRow.id),
+        eq(classStudents.isActive, true)
+      ))
+      .limit(1);
+
+    if (!enrollment) {
+      return NextResponse.json(
+        { error: 'You are not enrolled in any class with tutoring enabled' },
+        { status: 404 }
+      );
+    }
+
+    if (!enrollment.tutorConfigId) {
+      return NextResponse.json(
+        { error: 'No tutor configuration found for this class. Please contact your teacher.' },
+        { status: 404 }
+      );
+    }
+
     const [created] = await database
       .insert(tutorSessions)
       .values({
-        classId: DEMO_CLASS_ID,
+        classId: enrollment.classId,
         studentId: studentRow.id,
-        tutorConfigId: DEMO_TUTOR_CONFIG_ID,
+        tutorConfigId: enrollment.tutorConfigId,
         status: 'active',
         title: 'New tutoring session',
       })
