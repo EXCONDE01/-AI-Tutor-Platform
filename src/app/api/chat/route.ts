@@ -27,6 +27,8 @@ import { DEMO_CLASS_ID, DEMO_TUTOR_CONFIG_ID } from '@/lib/tenant';
 import { resolveModelChain, streamTutorText } from '@/lib/ai/openrouter';
 import { getRelevantContext } from '@/lib/ai/rag';
 import { generateSessionSummary, storeSessionLearningEmbeddings } from '@/lib/ai/summarize';
+import { filterMessage, createFilterAuditLog } from '@/lib/compliance/content-filter';
+import { createAuditLog } from '@/lib/compliance/audit';
 import type { ModelMessage } from 'ai';
 
 export const dynamic = 'force-dynamic';
@@ -108,7 +110,7 @@ export async function POST(request: NextRequest) {
     const { message, images } = parsed.data;
     const database = getDb();
 
-    // Resolve the caller's profile rows.
+    // Resolve the caller's profile rows first.
     const [studentRow] = await database
       .select({ id: students.id })
       .from(students)
@@ -128,6 +130,51 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const requestedId = parsed.data.sessionId;
+
+    // Content filter - check message before processing
+    const filterResult = await filterMessage(message, {
+      studentId: studentRow?.id,
+      userId: appUser.user.id,
+      sessionId: requestedId && UUID_RE.test(requestedId) ? requestedId : undefined,
+    });
+
+    if (!filterResult.allowed) {
+      // Log the blocked message
+      await createAuditLog({
+        ...createFilterAuditLog(filterResult, message, {
+          studentId: studentRow?.id,
+          userId: appUser.user.id,
+          sessionId: requestedId && UUID_RE.test(requestedId) ? requestedId : undefined,
+        }),
+        action: filterResult.allowed ? 'content_filter_pass' : 'content_filter_block',
+      } as any);
+
+      return NextResponse.json(
+        { 
+          error: 'Message blocked by content filter',
+          reason: filterResult.reason,
+          filteredMessage: filterResult.filteredMessage,
+        },
+        { status: 400 }
+      );
+    }
+
+    // Use filtered message if provided (sanitized version)
+    const filteredMessage = filterResult.filteredMessage && filterResult.filteredMessage !== message
+      ? filterResult.filteredMessage
+      : message;
+
+    // Log passed filter
+    await createAuditLog({
+      ...createFilterAuditLog(filterResult, message, {
+        studentId: studentRow?.id,
+        userId: appUser.user.id,
+        sessionId: requestedId && UUID_RE.test(requestedId) ? requestedId : undefined,
+      }),
+      action: 'content_filter_pass',
+    } as any);
+
     // Resolve an existing session the caller is allowed to use.
     let tutorSession:
       | {
@@ -141,7 +188,6 @@ export async function POST(request: NextRequest) {
         }
       | undefined;
 
-    const requestedId = parsed.data.sessionId;
     if (requestedId && UUID_RE.test(requestedId)) {
       const [candidate] = await database
         .select({
@@ -291,7 +337,7 @@ export async function POST(request: NextRequest) {
 
     const modelMessages: ModelMessage[] = [
       ...historyMessages,
-      { role: 'user', content: message },
+      { role: 'user', content: filteredMessage },
     ];
 
     // Persist the user message before streaming.
@@ -299,7 +345,7 @@ export async function POST(request: NextRequest) {
     await database.insert(messagesTable).values({
       sessionId: tutorSession.id,
       role: 'user',
-      content: message,
+      content: filteredMessage,
       contentType: 'text',
       sequence: userSequence,
       metadata: images?.length ? { images } : {},
@@ -362,7 +408,7 @@ export async function POST(request: NextRequest) {
           if (!tutorSession.title || tutorSession.title === 'New tutoring session') {
             await database
               .update(tutorSessions)
-              .set({ title: message.slice(0, 60) })
+              .set({ title: filteredMessage.slice(0, 60) })
               .where(eq(tutorSessions.id, sessionId));
           }
         } catch (error) {

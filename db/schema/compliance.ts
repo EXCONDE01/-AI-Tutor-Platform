@@ -38,6 +38,8 @@ export const retentionCategoryEnum = pgEnum('retention_category', [
   'lti_data',
   'analytics',
   'backups',
+  'push_subscriptions',
+  'session_summaries',
   'custom'
 ]);
 

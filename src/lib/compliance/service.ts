@@ -34,6 +34,7 @@ import {
   PolicyDocument,
 } from './types';
 import { createAuditLog } from './audit';
+import { executeRetentionJob } from './retention-engine';
 
 // ============================================================================
 // COPPA - Children's Online Privacy Protection Act
@@ -688,100 +689,34 @@ export async function createRetentionPolicy(
 }
 
 /**
- * Run retention job for a policy
+ * Run retention job for a policy (delegates to retention-engine)
  */
 export async function runRetentionJob(policyId: string, triggeredBy: string): Promise<RetentionJobResult> {
-  const database = getDb();
-  const startTime = Date.now();
+  return executeRetentionJob(policyId, triggeredBy);
+}
 
-  const [policy] = await database
-    .select()
-    .from(retentionPolicies)
-    .where(eq(retentionPolicies.id, policyId))
-    .limit(1);
+/**
+ * Run all active retention policies (for cron job)
+ */
+export async function runAllRetentionPolicies(
+  triggeredBy: string,
+  districtId?: string,
+  schoolId?: string
+): Promise<RetentionJobResult[]> {
+  const { runAllRetentionPolicies: runAll } = await import('./retention-engine');
+  return runAll(triggeredBy, districtId, schoolId);
+}
 
-  if (!policy || !policy.isActive) {
-    throw new Error('Policy not found or inactive');
-  }
-
-  // Create job record
-  const [job] = await database
-    .insert(retentionJobs)
-    .values({
-      policyId,
-      status: 'running',
-      scope: { triggeredBy, triggeredAt: new Date().toISOString() },
-      startedAt: new Date(),
-    })
-    .returning();
-
-  await createAuditLog({
-    action: 'retention_job_started',
-    resourceType: 'retention_job',
-    resourceId: job.id,
-    userId: triggeredBy,
-    severity: 'info',
-    description: `Retention job started for policy ${policy.category}`,
-    metadata: {},
-  });
-
-  try {
-    // In production, this would actually delete/archive records
-    // For now, simulate the job
-    const result: RetentionJobResult = {
-      policyId,
-      recordsProcessed: 0,
-      recordsArchived: 0,
-      recordsDeleted: 0,
-      errors: [],
-      durationMs: Date.now() - startTime,
-    };
-
-    await database
-      .update(retentionJobs)
-      .set({
-        status: 'completed',
-        recordsProcessed: result.recordsProcessed,
-        recordsArchived: result.recordsArchived,
-        recordsDeleted: result.recordsDeleted,
-        completedAt: new Date(),
-        nextRunAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // Next day
-      })
-      .where(eq(retentionJobs.id, job.id));
-
-    await createAuditLog({
-      action: 'retention_job_completed',
-      resourceType: 'retention_job',
-      resourceId: job.id,
-      userId: triggeredBy,
-      severity: 'info',
-      description: `Retention job completed for policy ${policy.category}`,
-      metadata: result,
-    });
-
-    return result;
-  } catch (error) {
-    await database
-      .update(retentionJobs)
-      .set({
-        status: 'failed',
-        errors: [{ table: 'unknown', error: error instanceof Error ? error.message : 'Unknown error' }],
-        completedAt: new Date(),
-      })
-      .where(eq(retentionJobs.id, job.id));
-
-    await createAuditLog({
-      action: 'retention_job_failed',
-      resourceType: 'retention_job',
-      resourceId: job.id,
-      userId: triggeredBy,
-      severity: 'critical',
-      description: `Retention job failed for policy ${policy.category}`,
-      metadata: { error: error instanceof Error ? error.message : 'Unknown error' },
-    });
-
-    throw error;
-  }
+/**
+ * Create default retention policies for a district
+ */
+export async function createDefaultRetentionPolicies(
+  districtId: string | null,
+  schoolId: string | null,
+  createdBy: string
+): Promise<void> {
+  const { createDefaultRetentionPolicies: createDefaults } = await import('./retention-engine');
+  return createDefaults(districtId, schoolId, createdBy);
 }
 
 /**

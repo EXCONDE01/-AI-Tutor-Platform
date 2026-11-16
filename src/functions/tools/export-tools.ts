@@ -1,6 +1,6 @@
 /**
  * Export Tools for Tutor Function
- * Callable by the tutor agent to export content to Google Workspace
+ * Callable by the tutor agent to export content to Google Workspace and Microsoft 365
  */
 
 import { z } from 'zod';
@@ -8,6 +8,10 @@ import { GoogleDocsClient } from '@/lib/google/docs';
 import { GoogleFormsClient, type FormQuestion } from '@/lib/google/forms';
 import { GoogleSlidesClient, type SlideContent } from '@/lib/google/slides';
 import { GoogleTokenStore } from '@/lib/google/token-store';
+import { createWordDocument } from '@/lib/microsoft/word';
+import { createPowerPoint } from '@/lib/microsoft/powerpoint';
+import { createMicrosoftForm } from '@/lib/microsoft/forms';
+import { microsoftTokenStore } from '@/lib/microsoft/token-store';
 import { db } from '@/lib/db';
 import { exportJobs, generatedArtifacts } from '@/db/schema/artifacts';
 import { eq } from 'drizzle-orm';
@@ -361,6 +365,381 @@ export const exportTools = {
       };
     },
   },
+
+  // Microsoft Word Export
+  exportArtifactToWord: {
+    name: 'exportArtifactToWord',
+    description:
+      'Export an existing artifact to a Microsoft Word document in OneDrive',
+    parameters: z.object({
+      artifactId: z.string().uuid().describe('ID of the artifact to export'),
+      title: z.string().optional().describe('Optional custom title'),
+      folderName: z.string().optional().describe('OneDrive folder name'),
+    }),
+    execute: async (
+      { artifactId, title, folderName }: { artifactId: string; title?: string; folderName?: string },
+      context: ToolContext
+    ) => {
+      const accessToken = await microsoftTokenStore.getValidAccessToken(context.userId);
+
+      if (!accessToken) {
+        throw new Error(
+          'Microsoft account not connected. Please connect your Microsoft account first.'
+        );
+      }
+
+      // Fetch artifact
+      const [artifact] = await context.db
+        .select()
+        .from(generatedArtifacts)
+        .where(eq(generatedArtifacts.id, artifactId))
+        .limit(1);
+
+      if (!artifact) {
+        throw new Error('Artifact not found');
+      }
+
+      // Build content from artifact
+      const content = artifact.markdownContent ||
+        (typeof artifact.content === 'string'
+          ? artifact.content
+          : JSON.stringify(artifact.content, null, 2));
+
+      // Parse sections for Word document
+      const sections = parseArtifactSections(artifact);
+
+      const result = await createWordDocument(context.userId, {
+        title: title || artifact.title,
+        sections,
+        fileName: title || artifact.title,
+        folderName,
+      });
+
+      // Log export job
+      await context.db.insert(exportJobs).values({
+        artifactId,
+        requestedBy: context.userId,
+        format: 'word',
+        status: 'completed',
+        destination: result.webUrl,
+        destinationType: 'word',
+        resultUrl: result.webUrl,
+        completedAt: new Date(),
+      });
+
+      return {
+        success: true,
+        url: result.webUrl,
+        fileId: result.fileId,
+        message: `Exported artifact to Microsoft Word: ${result.webUrl}`,
+      };
+    },
+  },
+
+  exportArtifactToPowerPoint: {
+    name: 'exportArtifactToPowerPoint',
+    description:
+      'Export an existing artifact to a Microsoft PowerPoint presentation in OneDrive',
+    parameters: z.object({
+      artifactId: z.string().uuid().describe('ID of the artifact to export'),
+      title: z.string().optional().describe('Optional custom title'),
+      folderName: z.string().optional().describe('OneDrive folder name'),
+    }),
+    execute: async (
+      { artifactId, title, folderName }: { artifactId: string; title?: string; folderName?: string },
+      context: ToolContext
+    ) => {
+      const accessToken = await microsoftTokenStore.getValidAccessToken(context.userId);
+
+      if (!accessToken) {
+        throw new Error(
+          'Microsoft account not connected. Please connect your Microsoft account first.'
+        );
+      }
+
+      const [artifact] = await context.db
+        .select()
+        .from(generatedArtifacts)
+        .where(eq(generatedArtifacts.id, artifactId))
+        .limit(1);
+
+      if (!artifact) {
+        throw new Error('Artifact not found');
+      }
+
+      // Parse slides from artifact content
+      const parsedSlides = parseArtifactSlides(artifact);
+      // Convert to Microsoft format
+      const slides = parsedSlides.map(s => ({
+        title: s.title,
+        content: [s.content],
+        layout: 'titleAndContent' as const,
+      }));
+
+      const result = await createPowerPoint(context.userId, {
+        title: title || artifact.title,
+        slides,
+        fileName: title || artifact.title,
+        folderName,
+      });
+
+      await context.db.insert(exportJobs).values({
+        artifactId,
+        requestedBy: context.userId,
+        format: 'powerpoint',
+        status: 'completed',
+        destination: result.webUrl,
+        destinationType: 'powerpoint',
+        resultUrl: result.webUrl,
+        completedAt: new Date(),
+      });
+
+      return {
+        success: true,
+        url: result.webUrl,
+        fileId: result.fileId,
+        message: `Exported artifact to Microsoft PowerPoint: ${result.webUrl}`,
+      };
+    },
+  },
+
+  exportArtifactToMicrosoftForm: {
+    name: 'exportArtifactToMicrosoftForm',
+    description:
+      'Export an existing artifact as a Microsoft Form template (saved as JSON in OneDrive)',
+    parameters: z.object({
+      artifactId: z.string().uuid().describe('ID of the artifact to export'),
+      title: z.string().optional().describe('Optional custom title'),
+      folderName: z.string().optional().describe('OneDrive folder name'),
+    }),
+    execute: async (
+      { artifactId, title, folderName }: { artifactId: string; title?: string; folderName?: string },
+      context: ToolContext
+    ) => {
+      const accessToken = await microsoftTokenStore.getValidAccessToken(context.userId);
+
+      if (!accessToken) {
+        throw new Error(
+          'Microsoft account not connected. Please connect your Microsoft account first.'
+        );
+      }
+
+      const [artifact] = await context.db
+        .select()
+        .from(generatedArtifacts)
+        .where(eq(generatedArtifacts.id, artifactId))
+        .limit(1);
+
+      if (!artifact) {
+        throw new Error('Artifact not found');
+      }
+
+      // Parse questions from artifact content
+      const parsedQuestions = parseArtifactQuestions(artifact);
+      // Convert to Microsoft format
+      const questions = parsedQuestions.map(q => ({
+        type: 'text' as const,
+        question: q.title,
+        required: q.required ?? false,
+        options: q.options,
+      }));
+
+      const result = await createMicrosoftForm(context.userId, {
+        title: title || artifact.title,
+        questions,
+        fileName: title || artifact.title,
+        folderName,
+      });
+
+      await context.db.insert(exportJobs).values({
+        artifactId,
+        requestedBy: context.userId,
+        format: 'microsoft_forms',
+        status: 'completed',
+        destination: result.webUrl,
+        destinationType: 'microsoft_forms',
+        resultUrl: result.webUrl,
+        completedAt: new Date(),
+      });
+
+      return {
+        success: true,
+        url: result.webUrl,
+        fileId: result.formId,
+        message: `Exported artifact to Microsoft Forms template: ${result.webUrl}. Open in Microsoft Forms to finalize.`,
+      };
+    },
+  },
+
+  // Also add direct export tools (not from artifact)
+  exportToWord: {
+    name: 'exportToWord',
+    description:
+      'Export content to a new Microsoft Word document. Requires teacher to have connected Microsoft account.',
+    parameters: z.object({
+      content: z.string().describe('The content to export (markdown or plain text)'),
+      title: z.string().describe('Title for the Word document'),
+      folderName: z.string().optional().describe('OneDrive folder name'),
+    }),
+    execute: async (
+      { content, title, folderName }: { content: string; title: string; folderName?: string },
+      context: ToolContext
+    ) => {
+      const accessToken = await microsoftTokenStore.getValidAccessToken(context.userId);
+
+      if (!accessToken) {
+        throw new Error(
+          'Microsoft account not connected. Please connect your Microsoft account first.'
+        );
+      }
+
+      const sections = content.split('\n\n').map((section, i) => {
+        const lines = section.trim().split('\n');
+        return {
+          heading: lines[0] || `Section ${i + 1}`,
+          body: lines.slice(1).join('\n') || 'Content here...',
+        };
+      });
+
+      const result = await createWordDocument(context.userId, {
+        title,
+        sections,
+        fileName: title,
+        folderName,
+      });
+
+      await context.db.insert(exportJobs).values({
+        artifactId: null,
+        requestedBy: context.userId,
+        format: 'word',
+        status: 'completed',
+        destination: result.webUrl,
+        destinationType: 'word',
+        resultUrl: result.webUrl,
+        completedAt: new Date(),
+      });
+
+      return {
+        success: true,
+        url: result.webUrl,
+        fileId: result.fileId,
+        message: `Exported to Microsoft Word: ${result.webUrl}`,
+      };
+    },
+  },
+
+  exportToPowerPoint: {
+    name: 'exportToPowerPoint',
+    description:
+      'Export slides to a new Microsoft PowerPoint presentation. Requires teacher to have connected Microsoft account.',
+    parameters: z.object({
+      slides: z
+        .array(
+          z.object({
+            title: z.string(),
+            content: z.array(z.string()),
+            layout: z.enum(['title', 'titleAndContent', 'twoContent', 'blank']).default('titleAndContent'),
+          })
+        )
+        .min(1),
+      title: z.string(),
+      folderName: z.string().optional().describe('OneDrive folder name'),
+    }),
+    execute: async (
+      { slides, title, folderName }: { slides: any[]; title: string; folderName?: string },
+      context: ToolContext
+    ) => {
+      const accessToken = await microsoftTokenStore.getValidAccessToken(context.userId);
+
+      if (!accessToken) {
+        throw new Error(
+          'Microsoft account not connected. Please connect your Microsoft account first.'
+        );
+      }
+
+      const result = await createPowerPoint(context.userId, {
+        title,
+        slides,
+        fileName: title,
+        folderName,
+      });
+
+      await context.db.insert(exportJobs).values({
+        artifactId: null,
+        requestedBy: context.userId,
+        format: 'powerpoint',
+        status: 'completed',
+        destination: result.webUrl,
+        destinationType: 'powerpoint',
+        resultUrl: result.webUrl,
+        completedAt: new Date(),
+      });
+
+      return {
+        success: true,
+        url: result.webUrl,
+        fileId: result.fileId,
+        message: `Exported to Microsoft PowerPoint: ${result.webUrl}`,
+      };
+    },
+  },
+
+  exportToMicrosoftForm: {
+    name: 'exportToMicrosoftForm',
+    description:
+      'Create a Microsoft Form template. Requires teacher to have connected Microsoft account.',
+    parameters: z.object({
+      questions: z
+        .array(
+          z.object({
+            type: z.enum(['text', 'choice', 'rating', 'date']),
+            question: z.string(),
+            required: z.boolean().default(false),
+            options: z.array(z.string()).optional(),
+          })
+        )
+        .min(1),
+      title: z.string(),
+      folderName: z.string().optional().describe('OneDrive folder name'),
+    }),
+    execute: async (
+      { questions, title, folderName }: { questions: any[]; title: string; folderName?: string },
+      context: ToolContext
+    ) => {
+      const accessToken = await microsoftTokenStore.getValidAccessToken(context.userId);
+
+      if (!accessToken) {
+        throw new Error(
+          'Microsoft account not connected. Please connect your Microsoft account first.'
+        );
+      }
+
+      const result = await createMicrosoftForm(context.userId, {
+        title,
+        questions,
+        fileName: title,
+        folderName,
+      });
+
+      await context.db.insert(exportJobs).values({
+        artifactId: null,
+        requestedBy: context.userId,
+        format: 'microsoft_forms',
+        status: 'completed',
+        destination: result.webUrl,
+        destinationType: 'microsoft_forms',
+        resultUrl: result.webUrl,
+        completedAt: new Date(),
+      });
+
+      return {
+        success: true,
+        url: result.webUrl,
+        fileId: result.formId,
+        message: `Created Microsoft Forms template: ${result.webUrl}. Open in Microsoft Forms to finalize.`,
+      };
+    },
+  },
 };
 
 function parseArtifactQuestions(
@@ -412,6 +791,65 @@ function parseArtifactQuestions(
 
   // Default: create one question from title
   return [{ title: artifact.title, type: 'short_answer' }];
+}
+
+function parseArtifactSections(
+  artifact: typeof generatedArtifacts.$inferSelect
+): Array<{ heading: string; body: string }> {
+  const content = artifact.content as any;
+
+  if (Array.isArray(content)) {
+    return content.map(s => ({
+      heading: s.title || s.heading || '',
+      body: s.content || s.body || '',
+    }));
+  }
+
+  if (typeof content === 'string') {
+    // Try to parse as JSON
+    try {
+      const parsed = JSON.parse(content);
+      if (Array.isArray(parsed)) {
+        return parsed.map(s => ({
+          heading: s.title || s.heading || '',
+          body: s.content || s.body || '',
+        }));
+      }
+    } catch {
+      // Try markdown with ## headings
+      const sections = content.split(/^##\s+/m);
+      if (sections.length > 1) {
+        return sections.slice(1).map(section => {
+          const lines = section.trim().split('\n');
+          const heading = lines[0] || 'Section';
+          const body = lines.slice(1).join('\n');
+          return { heading, body };
+        });
+      }
+      // Try single # heading
+      const h1Sections = content.split(/^#\s+/m);
+      if (h1Sections.length > 1) {
+        return h1Sections.slice(1).map(section => {
+          const lines = section.trim().split('\n');
+          const heading = lines[0] || 'Section';
+          const body = lines.slice(1).join('\n');
+          return { heading, body };
+        });
+      }
+    }
+  }
+
+  // Default: single section with all content
+  return [
+    {
+      heading: artifact.title,
+      body:
+        artifact.markdownContent ||
+        (typeof artifact.content === 'string'
+          ? artifact.content
+          : JSON.stringify(artifact.content, null, 2)),
+    },
+  ];
 }
 
 function parseArtifactSlides(

@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { 
   Download, 
@@ -11,10 +12,19 @@ import {
   Settings, 
   AlertCircle,
   CheckCircle,
+  Globe,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { signOut } from "@/lib/auth/client";
 import { ParentSettingsSkeleton } from "@/components/ui/page-skeletons";
+
+interface GoogleStatus {
+  connected: boolean;
+}
+
+interface MicrosoftStatus {
+  connected: boolean;
+}
 
 const GITHUB_REPO = "EXCONDE01/-AI-Tutor-Platform";
 const APK_RELEASE_URL = `https://github.com/${GITHUB_REPO}/releases/tag/apk-latest`;
@@ -24,9 +34,39 @@ const APK_ARTIFACT_URL = `https://github.com/${GITHUB_REPO}/actions/workflows/bu
 
 export default function ParentSettingsPage() {
   const router = useRouter();
+  const [googleConnected, setGoogleConnected] = useState<boolean | null>(null);
+  const [microsoftConnected, setMicrosoftConnected] = useState<boolean | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [downloadSuccess, setDownloadSuccess] = useState<string | null>(null);
+
+  const checkGoogleStatus = async () => {
+    try {
+      const res = await fetch("/api/auth/google/status", { credentials: "include" });
+      const data: GoogleStatus = await res.json();
+      setGoogleConnected(data.connected);
+    } catch {
+      setGoogleConnected(false);
+    }
+  };
+
+  const checkMicrosoftStatus = async () => {
+    try {
+      const res = await fetch("/api/auth/microsoft/status", { credentials: "include" });
+      const data: MicrosoftStatus = await res.json();
+      setMicrosoftConnected(data.connected);
+    } catch {
+      setMicrosoftConnected(false);
+    }
+  };
+
+  useEffect(() => {
+    const loadStatus = async () => {
+      await checkGoogleStatus();
+      await checkMicrosoftStatus();
+    };
+    loadStatus();
+  }, []);
 
   const handleDownloadAPK = async () => {
     setDownloading(true);
@@ -68,6 +108,11 @@ export default function ParentSettingsPage() {
     router.push("/sign-in");
   };
 
+  // Show skeleton while checking connection status
+  if (googleConnected === null || microsoftConnected === null) {
+    return <ParentSettingsSkeleton />;
+  }
+
   return (
     <div className="max-w-3xl mx-auto p-6 space-y-6">
       <div className="flex items-center gap-3">
@@ -84,6 +129,74 @@ export default function ParentSettingsPage() {
           {downloadError || downloadSuccess}
         </div>
       )}
+
+      {/* Google Drive Integration */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Globe className="h-5 w-5" />
+            Google Drive Integration
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium">Import from Google Drive</p>
+              <p className="text-sm text-muted-foreground">
+                Connect your Google account to import reading passages and documents from Google Drive.
+              </p>
+            </div>
+            {googleConnected ? (
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 text-green-600">
+                  <CheckCircle className="h-5 w-5" />
+                  <span className="font-medium">Connected</span>
+                </div>
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground">
+                Not connected (connect in teacher settings)
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Microsoft OneDrive Integration */}
+      <Card className="border-amber-200 bg-amber-50">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Globe className="h-5 w-5" />
+            Microsoft OneDrive Integration
+            <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-200 ml-2">
+              Coming Soon
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium">Import from OneDrive</p>
+              <p className="text-sm text-muted-foreground">
+                Connect your Microsoft account to import reading passages and documents from OneDrive.
+              </p>
+            </div>
+            <Button variant="outline" disabled className="text-muted-foreground border-muted">
+              Not Configured
+            </Button>
+          </div>
+
+          <Separator />
+
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800">
+            <p className="font-medium">⚠ Azure AD Setup Required</p>
+            <p className="text-sm mt-1">
+              Microsoft 365 integration requires an Azure App Registration with valid credentials.
+              Ask your teacher to configure this in their settings.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Mobile App Download */}
       <Card>
@@ -135,7 +248,7 @@ export default function ParentSettingsPage() {
             <div className="text-sm text-muted-foreground space-y-2">
               <p><strong>Installation Instructions:</strong></p>
               <ol className="list-decimal list-inside space-y-1">
-                <li>Tap "Download APK Directly" above</li>
+                <li>Tap &#34;Download APK Directly&#34; above</li>
                 <li>When prompted, allow downloads from your browser</li>
                 <li>Open the downloaded <code>app-debug.apk</code> file</li>
                 <li>If blocked, enable <strong>Settings → Security → Install unknown apps</strong> for your browser</li>

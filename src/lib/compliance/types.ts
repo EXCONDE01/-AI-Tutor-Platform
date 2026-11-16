@@ -156,6 +156,8 @@ export type RetentionCategory =
   | 'lti_data'
   | 'analytics'
   | 'backups'
+  | 'push_subscriptions'
+  | 'session_summaries'
   | 'custom';
 
 export interface RetentionException {
@@ -267,6 +269,9 @@ export type ComplianceAuditAction =
   | 'retention_job_started'
   | 'retention_job_completed'
   | 'retention_job_failed'
+  // Content Filter
+  | 'content_filter_pass'
+  | 'content_filter_block'
   // FERPA
   | 'ferpa_optout_requested'
   | 'ferpa_optout_approved'

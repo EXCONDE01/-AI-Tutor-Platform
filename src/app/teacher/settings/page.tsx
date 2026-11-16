@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -23,6 +24,10 @@ interface GoogleStatus {
   connected: boolean;
 }
 
+interface MicrosoftStatus {
+  connected: boolean;
+}
+
 const GITHUB_REPO = "EXCONDE01/-AI-Tutor-Platform";
 const APK_RELEASE_URL = `https://github.com/${GITHUB_REPO}/releases/tag/apk-latest`;
 const APK_DIRECT_URL = `https://github.com/${GITHUB_REPO}/releases/download/apk-latest/app-debug.apk`;
@@ -32,6 +37,7 @@ const APK_ARTIFACT_URL = `https://github.com/${GITHUB_REPO}/actions/workflows/bu
 export default function TeacherSettingsPage() {
   const router = useRouter();
   const [googleConnected, setGoogleConnected] = useState<boolean | null>(null);
+  const [microsoftConnected, setMicrosoftConnected] = useState<boolean | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,9 +56,20 @@ export default function TeacherSettingsPage() {
     }
   };
 
+  const checkMicrosoftStatus = async () => {
+    try {
+      const res = await fetch("/api/auth/microsoft/status", { credentials: "include" });
+      const data: MicrosoftStatus = await res.json();
+      setMicrosoftConnected(data.connected);
+    } catch {
+      setMicrosoftConnected(false);
+    }
+  };
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     checkGoogleStatus();
+    checkMicrosoftStatus();
     
     // Check for URL params from OAuth callback
     const params = new URLSearchParams(window.location.search);
@@ -65,11 +82,25 @@ export default function TeacherSettingsPage() {
       setError(`Connection failed: ${params.get("google_error")}`);
       window.history.replaceState({}, "", "/teacher/settings");
     }
+    if (params.get("microsoft_connected") === "true") {
+      setSuccess("Microsoft account connected successfully!");
+      setMicrosoftConnected(true);
+      window.history.replaceState({}, "", "/teacher/settings");
+    }
+    if (params.get("microsoft_error")) {
+      setError(`Connection failed: ${params.get("microsoft_error")}`);
+      window.history.replaceState({}, "", "/teacher/settings");
+    }
   }, []);
 
   const handleConnectGoogle = () => {
     setConnecting(true);
     router.push("/api/auth/google");
+  };
+
+  const handleConnectMicrosoft = () => {
+    setConnecting(true);
+    router.push("/api/auth/microsoft");
   };
 
   const handleDisconnectGoogle = async () => {
@@ -83,6 +114,28 @@ export default function TeacherSettingsPage() {
       if (res.ok) {
         setGoogleConnected(false);
         setSuccess("Google account disconnected");
+      } else {
+        const err = await res.json();
+        setError(err.error || "Failed to disconnect");
+      }
+    } catch {
+      setError("Failed to disconnect");
+    } finally {
+      setDisconnecting(false);
+    }
+  };
+
+  const handleDisconnectMicrosoft = async () => {
+    setDisconnecting(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/auth/microsoft/disconnect", {
+        method: "POST",
+        credentials: "include",
+      });
+      if (res.ok) {
+        setMicrosoftConnected(false);
+        setSuccess("Microsoft account disconnected");
       } else {
         const err = await res.json();
         setError(err.error || "Failed to disconnect");
@@ -135,7 +188,7 @@ export default function TeacherSettingsPage() {
   };
 
   // Show skeleton while checking connection status
-  if (googleConnected === null) {
+  if (googleConnected === null || microsoftConnected === null) {
     return <TeacherSettingsSkeleton />;
   }
 
@@ -212,6 +265,56 @@ export default function TeacherSettingsPage() {
         </CardContent>
       </Card>
 
+      {/* Microsoft 365 Integration */}
+      <Card className="border-amber-200 bg-amber-50">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Globe className="h-5 w-5" />
+            Microsoft 365 Integration
+            <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-200 ml-2">
+              Coming Soon
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium">Word, PowerPoint & Forms Export</p>
+              <p className="text-sm text-muted-foreground">
+                Connect your Microsoft account to export tutor-generated content directly to Microsoft 365.
+              </p>
+            </div>
+            <Button variant="outline" disabled className="text-muted-foreground border-muted">
+              Not Configured
+            </Button>
+          </div>
+
+          <Separator />
+
+          <div className="text-sm text-muted-foreground space-y-2">
+            <p><strong>Scopes requested:</strong></p>
+            <ul className="list-disc list-inside space-y-1">
+              <li>OneDrive (file access)</li>
+              <li>Word (create/edit documents)</li>
+              <li>PowerPoint (create/edit presentations)</li>
+              <li>Microsoft Forms (create/edit forms)</li>
+            </ul>
+            <p className="pt-2">
+              Tokens are encrypted at rest using AES-256-GCM and automatically refreshed.
+            </p>
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800">
+              <p className="font-medium">⚠ Azure AD Setup Required</p>
+              <p className="text-sm mt-1">
+                Microsoft 365 integration requires an Azure App Registration with valid credentials.
+                Add <code>MICROSOFT_CLIENT_ID</code>, <code>MICROSOFT_CLIENT_SECRET</code>, 
+                <code>MICROSOFT_REDIRECT_URI</code>, and <code>MICROSOFT_TENANT_ID</code> 
+                to Vercel environment variables to enable this feature.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Mobile App Download */}
       <Card>
         <CardHeader>
@@ -262,7 +365,7 @@ export default function TeacherSettingsPage() {
             <div className="text-sm text-muted-foreground space-y-2">
               <p><strong>Installation Instructions:</strong></p>
               <ol className="list-decimal list-inside space-y-1">
-                <li>Tap "Download APK Directly" above</li>
+                <li>Tap &#34;Download APK Directly&#34; above</li>
                 <li>When prompted, allow downloads from your browser</li>
                 <li>Open the downloaded <code>app-debug.apk</code> file</li>
                 <li>If blocked, enable <strong>Settings → Security → Install unknown apps</strong> for your browser</li>

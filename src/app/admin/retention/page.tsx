@@ -33,6 +33,8 @@ const categories = [
   "lti_data",
   "analytics",
   "backups",
+  "push_subscriptions",
+  "session_summaries",
   "custom",
 ] as const satisfies RetentionCategory[];
 
