@@ -112,11 +112,14 @@ export async function deleteAccountClient(password: string) {
 }
 
 /**
- * Link OAuth account
+ * Link OAuth account for sign-in
+ * Uses Better Auth's linkSocialAccount endpoint
  */
 export async function linkOAuthAccount(provider: 'google' | 'github' | 'microsoft') {
-  // Better Auth uses linkSocialAccount for OAuth linking
-  return await (authClient as any).linkSocialAccount?.({ provider, callbackURL: '/' });
+  return await authClient.$fetch('/link-social-account', {
+    method: 'POST',
+    body: { provider, callbackURL: '/' },
+  });
 }
 
 /**
