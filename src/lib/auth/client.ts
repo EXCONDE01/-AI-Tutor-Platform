@@ -113,10 +113,11 @@ export async function deleteAccountClient(password: string) {
 
 /**
  * Link OAuth account for sign-in
- * Uses Better Auth's linkSocialAccount endpoint
+ * Uses Better Auth's linkSocialAccount endpoint (/link-social)
+ * Returns { url: string, redirect: true } - need to redirect user to the URL
  */
-export async function linkOAuthAccount(provider: 'google' | 'github' | 'microsoft') {
-  return await authClient.$fetch('/link-social-account', {
+export async function linkOAuthAccount(provider: 'google' | 'github' | 'microsoft'): Promise<{ data?: { url: string; redirect: boolean }; error?: { message: string } }> {
+  return await authClient.$fetch('/link-social', {
     method: 'POST',
     body: { provider, callbackURL: '/' },
   });

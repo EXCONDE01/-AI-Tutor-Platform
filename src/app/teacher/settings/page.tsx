@@ -104,6 +104,9 @@ export default function TeacherSettingsPage() {
         } else {
           setError(result.error.message || "Failed to link Google account");
         }
+      } else if (result.data?.url) {
+        // Redirect user to Google OAuth for linking
+        window.location.href = result.data.url;
       } else {
         setSuccess("Google account linked successfully! You can now sign in with Google.");
         setGoogleConnected(true);
