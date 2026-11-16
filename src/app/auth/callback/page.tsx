@@ -48,7 +48,13 @@ function AuthCallbackContent() {
         });
 
         if (roleResponse.ok) {
-          const { role } = await roleResponse.json();
+          const { role, needsOnboarding } = await roleResponse.json();
+
+          // New user signing in with Google - redirect to onboarding to choose role
+          if (needsOnboarding) {
+            router.push("/onboarding");
+            return;
+          }
 
           // Existing user - redirect to appropriate dashboard
           switch (role) {

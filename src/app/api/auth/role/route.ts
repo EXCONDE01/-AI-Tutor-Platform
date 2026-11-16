@@ -78,14 +78,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ role: "admin" });
     }
 
-    // No existing profile - default to student for new signups
-    // (can be changed during onboarding)
-    const appUser = await ensureAppUser("student", request);
-    if (!appUser) {
-      return NextResponse.json({ error: "No app user found" }, { status: 404 });
-    }
-
-    return NextResponse.json({ role: appUser.role });
+    // No existing profile - NEW USER signing in with Google
+    // Return needs_onboarding flag so client can redirect to onboarding
+    return NextResponse.json({ role: null, needsOnboarding: true });
   } catch (error) {
     console.error('[/api/auth/role] Error:', error);
     return NextResponse.json(
