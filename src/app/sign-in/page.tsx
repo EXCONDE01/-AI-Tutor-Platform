@@ -93,6 +93,32 @@ function SignInContent() {
             </Alert>
           )}
 
+          {errorMessage && (errorMessage.includes('already registered') || errorMessage.includes('account_not_linked')) && (
+            <div className="space-y-2 p-3 bg-muted/50 rounded-lg">
+              <p className="text-sm font-medium text-muted-foreground">
+                Already have an account with this email?
+              </p>
+              <Button 
+                variant="outline" 
+                className="w-full gap-2"
+                onClick={() => {
+                  // Pre-fill email and focus password field
+                  setEmail('jelo.exconde@gmail.com');
+                  setTimeout(() => {
+                    const passwordInput = document.getElementById('password');
+                    passwordInput?.focus();
+                  }, 0);
+                }}
+              >
+                <Mail className="h-4 w-4" />
+                Sign in with Email instead
+              </Button>
+              <p className="text-xs text-center text-muted-foreground">
+                After signing in, go to Settings → Linked Accounts to connect Google
+              </p>
+            </div>
+          )}
+
           {registered && (
             <Alert variant="default" className="gap-2">
               <AlertCircle className="h-4 w-4 text-muted-foreground" />
