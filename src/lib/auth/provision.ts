@@ -142,13 +142,18 @@ export async function ensureAppUser(
   const existingByEmail = candidates.find((candidate) => candidate.email === email);
   const existingByExternalId = candidates.find((candidate) => candidate.externalId === authUserId);
 
-  // Case 1: Exact match by externalId (same Neon Auth account) - return existing
+  // Case 1: Exact match by externalId (same Neon Auth account)
   if (existingByExternalId) {
-    const existingRole = existingByExternalId.role as AppRole;
-    await ensureProfileRow(database, existingByExternalId.id, existingRole);
-    const result: ProvisionResult = { user: existingByExternalId, role: existingRole };
-    setCachedAppUser(authUserId, result);
-    return result;
+    // If user was deleted (inactive), treat as new registration - allow role selection
+    if (existingByExternalId.status === 'inactive') {
+      // Fall through to Case 2/3 logic to create/update with new role
+    } else {
+      const existingRole = existingByExternalId.role as AppRole;
+      await ensureProfileRow(database, existingByExternalId.id, existingRole);
+      const result: ProvisionResult = { user: existingByExternalId, role: existingRole };
+      setCachedAppUser(authUserId, result);
+      return result;
+    }
   }
 
   // Case 2: Match by email but different externalId (re-registered with new Neon Auth account)

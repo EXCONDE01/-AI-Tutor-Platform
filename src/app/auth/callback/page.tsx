@@ -34,19 +34,21 @@ function AuthCallbackContent() {
       await new Promise(resolve => setTimeout(resolve, 500));
 
       try {
-        // Check if user exists in our app database
+        // For SIGNUP mode: redirect directly to onboarding WITHOUT calling role API
+        // The role API would call ensureAppUser with default 'student' role
+        // which would create/update user before they select their role
+        if (mode === "signup") {
+          router.push("/onboarding");
+          return;
+        }
+
+        // SIGNIN mode: check role and redirect to appropriate dashboard
         const roleResponse = await fetch("/api/auth/role", {
           credentials: "include",
         });
 
         if (roleResponse.ok) {
           const { role } = await roleResponse.json();
-          
-          if (mode === "signup" && role === "student") {
-            // New user from sign-up flow - redirect to role selection/onboarding
-            router.push("/onboarding");
-            return;
-          }
 
           // Existing user - redirect to appropriate dashboard
           switch (role) {
@@ -68,7 +70,6 @@ function AuthCallbackContent() {
           router.refresh();
         } else {
           console.error('[AuthCallback] Role lookup failed:', roleResponse.status);
-          // If role lookup fails, try the fallback callback URL
           router.push(callbackUrl);
         }
       } catch (err) {
