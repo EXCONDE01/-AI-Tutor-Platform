@@ -19,6 +19,8 @@ import { ParentSettingsSkeleton } from "@/components/ui/page-skeletons";
 const GITHUB_REPO = "EXCONDE01/-AI-Tutor-Platform";
 const APK_RELEASE_URL = `https://github.com/${GITHUB_REPO}/releases/tag/apk-latest`;
 const APK_DIRECT_URL = `https://github.com/${GITHUB_REPO}/releases/download/apk-latest/app-debug.apk`;
+// Fallback to GitHub Actions artifact (requires login, but works immediately after build)
+const APK_ARTIFACT_URL = `https://github.com/${GITHUB_REPO}/actions/workflows/build-apk.yml`;
 
 export default function ParentSettingsPage() {
   const router = useRouter();
@@ -47,13 +49,18 @@ export default function ParentSettingsPage() {
     setDownloadSuccess(null);
     
     try {
+      // Try direct download from release
       window.open(APK_DIRECT_URL, "_blank");
-      setDownloadSuccess("Starting download... Check your browser downloads.");
+      setDownloadSuccess("Starting download... If it 404s, the build may still be running. Check GitHub Actions below.");
     } catch {
       setDownloadError("Direct download failed. Try the GitHub releases page instead.");
     } finally {
       setDownloading(false);
     }
+  };
+
+  const handleViewActions = () => {
+    window.open(APK_ARTIFACT_URL, "_blank");
   };
 
   const handleSignOut = async () => {
@@ -112,6 +119,14 @@ export default function ParentSettingsPage() {
               >
                 <Download className="h-4 w-4" />
                 {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Open GitHub Releases"}
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={handleViewActions}
+                className="flex-1 gap-2"
+              >
+                <Loader2 className="h-4 w-4" />
+                View GitHub Actions
               </Button>
             </div>
 

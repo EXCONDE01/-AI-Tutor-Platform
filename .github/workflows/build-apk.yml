@@ -41,6 +41,18 @@ jobs:
           cd android
           ./gradlew assembleDebug
 
+      - name: Verify APK exists
+        run: |
+          ls -la android/app/build/outputs/apk/debug/
+          test -f android/app/build/outputs/apk/debug/app-debug.apk && echo "APK found" || (echo "APK NOT FOUND" && exit 1)
+
+      - name: Upload APK as Artifact (fallback)
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
+
       - name: Upload APK to GitHub Release
         uses: softprops/action-gh-release@v1
         with:
