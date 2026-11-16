@@ -15,6 +15,9 @@ function AuthCallbackContent() {
 
   useEffect(() => {
     const handleCallback = async () => {
+      console.log('[AuthCallback] Mode:', mode, 'Error:', error, 'ErrorDesc:', errorDescription);
+      console.log('[AuthCallback] Full search params:', Array.from(searchParams.entries()));
+      
       if (error) {
         console.error('[AuthCallback] OAuth error:', error, errorDescription);
         
@@ -48,11 +51,13 @@ function AuthCallbackContent() {
 
         if (roleResponse.ok) {
           const { role } = await roleResponse.json();
+          console.log('[AuthCallback] Role from API:', role);
           
           // Handle "link" mode FIRST - before role-based redirects
           // In link mode, the session may belong to a different user (the one Google was linked to)
           // We just need to redirect back to settings where the original user is logged in
           if (mode === "link") {
+            console.log('[AuthCallback] Link mode - redirecting to settings');
             router.push("/teacher/settings?linked=google");
             router.refresh();
             return;

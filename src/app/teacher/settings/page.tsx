@@ -52,6 +52,7 @@ export default function TeacherSettingsPage() {
     
     // Check for URL params from OAuth callback
     const params = new URLSearchParams(window.location.search);
+    console.log('[Settings] URL params:', Array.from(params.entries()));
     if (params.get("google_connected") === "true") {
       setSuccess("Google account connected successfully!");
       setGoogleConnected(true);
