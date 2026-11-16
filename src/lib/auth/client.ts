@@ -113,22 +113,36 @@ export async function deleteAccountClient(password: string) {
 
 /**
  * Link OAuth account for sign-in
- * Uses Better Auth's linkSocialAccount endpoint (/link-social)
+ * Uses Better Auth's linkSocialAccount endpoint via the client
  * Returns { url: string, redirect: true } - need to redirect user to the URL
  */
 export async function linkOAuthAccount(provider: 'google' | 'github' | 'microsoft') {
-  console.log('[linkOAuthAccount] Calling /link-social with provider:', provider);
-  // Use authClient.$fetch which properly handles cookies and Neon Auth proxy
-  // callbackURL must be a full URL or path that handles the OAuth callback with state
+  console.log('[linkOAuthAccount] Calling linkSocialAccount with provider:', provider);
+  // Use the Better Auth client's linkSocialAccount method if available
+  // The authClient is a Better Auth React client which should have this method
+  const client = authClient as any;
+  
+  if (typeof client.linkSocialAccount === 'function') {
+    const result = await client.linkSocialAccount({ 
+      provider, 
+      callbackURL: typeof window !== 'undefined' 
+        ? window.location.origin + '/auth/callback?mode=link' 
+        : '/auth/callback?mode=link' 
+    });
+    console.log('[linkOAuthAccount] Result:', result);
+    return result as unknown as { data?: { url: string; redirect: boolean }; error?: { message: string } };
+  }
+  
+  // Fallback: try direct fetch to Neon Auth
   const callbackURL = typeof window !== 'undefined' 
     ? window.location.origin + '/auth/callback?mode=link' 
     : '/auth/callback?mode=link';
   
-  const result = await authClient.$fetch('/link-social', {
+  const result = await client.$fetch('/link-social', {
     method: 'POST',
     body: { provider, callbackURL },
   });
-  console.log('[linkOAuthAccount] Result:', result);
+  console.log('[linkOAuthAccount] Result (fallback):', result);
   return result as unknown as { data?: { url: string; redirect: boolean }; error?: { message: string } };
 }
 
