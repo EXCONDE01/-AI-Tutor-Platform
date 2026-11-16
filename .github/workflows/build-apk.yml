@@ -50,6 +50,9 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
       - name: Wait for PostgreSQL
         run: |
           for i in {1..30}; do
