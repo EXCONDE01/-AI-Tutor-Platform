@@ -32,10 +32,18 @@ export async function GET(request: NextRequest) {
 
     if (existingUsers.length > 0) {
       const existingUser = existingUsers[0];
-      const existingRole = existingUser.role as "teacher" | "student" | "parent" | "admin";
-      // Verify profile row exists for their role
-      await ensureProfileRow(database, existingUser.id, existingRole);
-      return NextResponse.json({ role: existingRole });
+      
+      // If externalId matches - same Neon Auth user, return existing role
+      if (existingUser.externalId === authUserId) {
+        const existingRole = existingUser.role as "teacher" | "student" | "parent" | "admin";
+        await ensureProfileRow(database, existingUser.id, existingRole);
+        return NextResponse.json({ role: existingRole });
+      }
+      
+      // Different externalId - NEW Neon Auth user with existing email
+      // This happens when old Neon Auth user was deleted but app user remains
+      // Treat as new user - redirect to onboarding
+      return NextResponse.json({ role: null, needsOnboarding: true });
     }
 
     // User doesn't exist yet - check if they have existing profile rows
