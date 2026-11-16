@@ -42,8 +42,24 @@ export async function signInWithEmail(email: string, password: string) {
 /**
  * Client-side sign in with OAuth provider
  */
-export async function signInWithOAuth(provider: 'google' | 'github' | 'microsoft') {
-  return await authClient.signIn.social({ provider: provider as any });
+export async function signInWithOAuth(provider: 'google' | 'github' | 'microsoft', callbackUrl?: string) {
+  return await authClient.signIn.social({ 
+    provider: provider as any,
+    callbackURL: callbackUrl || '/',
+    requestSignUp: false
+  });
+}
+
+/**
+ * Client-side sign up with OAuth provider
+ * Uses the same social sign-in endpoint but with requestSignUp: true
+ */
+export async function signUpWithOAuth(provider: 'google' | 'github' | 'microsoft', callbackUrl?: string) {
+  return await authClient.signIn.social({ 
+    provider: provider as any,
+    callbackURL: callbackUrl || '/',
+    requestSignUp: true
+  });
 }
 
 /**

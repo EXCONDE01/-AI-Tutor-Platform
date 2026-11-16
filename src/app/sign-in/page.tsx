@@ -157,7 +157,7 @@ function SignInContent() {
           <div className="grid grid-cols-2 gap-3">
             <Button
               variant="outline"
-              onClick={() => signInWithOAuth('google')}
+              onClick={() => signInWithOAuth('google', '/auth/callback?mode=signin')}
               disabled={isLoading}
               className="w-full"
             >
@@ -184,7 +184,7 @@ function SignInContent() {
 
             <Button
               variant="outline"
-              onClick={() => signInWithOAuth('github')}
+              onClick={() => signInWithOAuth('github', '/auth/callback?mode=signin')}
               disabled={isLoading}
               className="w-full"
             >

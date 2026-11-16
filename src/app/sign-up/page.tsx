@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useState, Suspense, useTransition } from "react";
-import { signUpWithEmail, signInWithOAuth } from "@/lib/auth/client";
+import { signUpWithEmail, signUpWithOAuth } from "@/lib/auth/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -297,7 +297,7 @@ function SignUpContent() {
               <span className="w-full border-t border-border" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-card px-3 text-muted-foreground">Or continue with</span>
+              <span className="bg-card px-3 text-muted-foreground">Or sign up with</span>
             </div>
           </div>
 
@@ -305,7 +305,7 @@ function SignUpContent() {
           <div className="grid grid-cols-2 gap-3">
             <Button
               variant="outline"
-              onClick={() => signInWithOAuth('google')}
+              onClick={() => signUpWithOAuth('google', '/auth/callback?mode=signup')}
               disabled={isLoading}
               className="w-full gap-2"
             >
@@ -332,7 +332,7 @@ function SignUpContent() {
 
             <Button
               variant="outline"
-              onClick={() => signInWithOAuth('github')}
+              onClick={() => signUpWithOAuth('github', '/auth/callback?mode=signup')}
               disabled={isLoading}
               className="w-full gap-2"
             >
