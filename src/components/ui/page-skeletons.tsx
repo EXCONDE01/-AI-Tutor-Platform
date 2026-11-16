@@ -90,6 +90,13 @@ export function TeacherSettingsSkeleton() {
         contentLines={3}
       />
 
+      {/* Mobile App Download Card */}
+      <CardSkeleton 
+        showHeader 
+        showContent 
+        contentLines={3}
+      />
+
       {/* Account Card */}
       <CardSkeleton 
         showHeader 
@@ -591,6 +598,58 @@ export function ParentChildDetailSkeleton() {
           <CardSkeleton showHeader showContent contentLines={4} />
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Student Settings Page Skeleton
+ */
+export function StudentSettingsSkeleton() {
+  return (
+    <div className="max-w-3xl mx-auto p-6 space-y-6">
+      <div className="flex items-center gap-3 mb-6">
+        <Skeleton className="h-8 w-8" variant="circular" />
+        <Skeleton className="h-8 w-1/4" variant="text" />
+      </div>
+
+      <CardSkeleton 
+        showHeader 
+        showContent 
+        contentLines={3}
+      />
+
+      <CardSkeleton 
+        showHeader 
+        showContent 
+        contentLines={1}
+      />
+    </div>
+  );
+}
+
+/**
+ * Parent Settings Page Skeleton
+ */
+export function ParentSettingsSkeleton() {
+  return (
+    <div className="max-w-3xl mx-auto p-6 space-y-6">
+      <div className="flex items-center gap-3 mb-6">
+        <Skeleton className="h-8 w-8" variant="circular" />
+        <Skeleton className="h-8 w-1/4" variant="text" />
+      </div>
+
+      <CardSkeleton 
+        showHeader 
+        showContent 
+        contentLines={3}
+      />
+
+      <CardSkeleton 
+        showHeader 
+        showContent 
+        contentLines={1}
+      />
     </div>
   );
 }
