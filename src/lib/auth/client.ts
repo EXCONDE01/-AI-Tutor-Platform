@@ -113,36 +113,22 @@ export async function deleteAccountClient(password: string) {
 
 /**
  * Link OAuth account for sign-in
- * Uses Better Auth's linkSocialAccount endpoint via the client
+ * Uses Better Auth's signIn.social with requestSignUp: false which handles linking when user is already authenticated
  * Returns { url: string, redirect: true } - need to redirect user to the URL
  */
 export async function linkOAuthAccount(provider: 'google' | 'github' | 'microsoft') {
-  console.log('[linkOAuthAccount] Calling linkSocialAccount with provider:', provider);
-  // Use the Better Auth client's linkSocialAccount method if available
-  // The authClient is a Better Auth React client which should have this method
-  const client = authClient as any;
-  
-  if (typeof client.linkSocialAccount === 'function') {
-    const result = await client.linkSocialAccount({ 
-      provider, 
-      callbackURL: typeof window !== 'undefined' 
-        ? window.location.origin + '/auth/callback?mode=link' 
-        : '/auth/callback?mode=link' 
-    });
-    console.log('[linkOAuthAccount] Result:', result);
-    return result as unknown as { data?: { url: string; redirect: boolean }; error?: { message: string } };
-  }
-  
-  // Fallback: try direct fetch to Neon Auth
+  console.log('[linkOAuthAccount] Calling signIn.social with provider:', provider, 'requestSignUp: false');
+  // Use signIn.social with requestSignUp: false - Better Auth treats this as "link account" when user has session
   const callbackURL = typeof window !== 'undefined' 
     ? window.location.origin + '/auth/callback?mode=link' 
     : '/auth/callback?mode=link';
   
-  const result = await client.$fetch('/link-social', {
-    method: 'POST',
-    body: { provider, callbackURL },
+  const result = await authClient.signIn.social({
+    provider,
+    callbackURL,
+    requestSignUp: false, // Key: tells Better Auth to link to existing account, not create new
   });
-  console.log('[linkOAuthAccount] Result (fallback):', result);
+  console.log('[linkOAuthAccount] Result:', result);
   return result as unknown as { data?: { url: string; redirect: boolean }; error?: { message: string } };
 }
 
