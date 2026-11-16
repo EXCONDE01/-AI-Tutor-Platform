@@ -11,6 +11,15 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # Mock env vars for build (no real DB needed for static export)
+      DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/postgres"
+      NEON_DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/postgres"
+      NEXTAUTH_SECRET: "build-secret-do-not-use-in-production"
+      NEXTAUTH_URL: "https://ai-tutor-platform-exconde.vercel.app"
+      NEXT_PUBLIC_APP_URL: "https://ai-tutor-platform-exconde.vercel.app"
+      # Disable telemetry
+      NEXT_TELEMETRY_DISABLED: "1"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -29,9 +38,13 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+        # Continue on error to see output
+        continue-on-error: false
 
       - name: Build web assets
         run: npm run build
+        # This might fail due to DB connections, let's see the error
+        continue-on-error: false
 
       - name: Sync Capacitor Android
         run: npx cap sync android
