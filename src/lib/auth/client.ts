@@ -116,20 +116,30 @@ export async function deleteAccountClient(password: string) {
  * Uses Better Auth's signIn.social with requestSignUp: false which handles linking when user is already authenticated
  * Returns { url: string, redirect: true } - need to redirect user to the URL
  */
-export async function linkOAuthAccount(provider: 'google' | 'github' | 'microsoft') {
+export async function linkOAuthAccount(provider: 'google' | 'github' | 'microsoft'): Promise<{ data?: { url: string; redirect: boolean }; error?: { message: string } }> {
   console.log('[linkOAuthAccount] Calling signIn.social with provider:', provider, 'requestSignUp: false');
   // Use signIn.social with requestSignUp: false - Better Auth treats this as "link account" when user has session
   const callbackURL = typeof window !== 'undefined' 
     ? window.location.origin + '/auth/callback?mode=link' 
     : '/auth/callback?mode=link';
   
-  const result = await authClient.signIn.social({
-    provider,
-    callbackURL,
-    requestSignUp: false, // Key: tells Better Auth to link to existing account, not create new
-  });
-  console.log('[linkOAuthAccount] Result:', result);
-  return result as unknown as { data?: { url: string; redirect: boolean }; error?: { message: string } };
+  try {
+    const result = await authClient.signIn.social({
+      provider,
+      callbackURL,
+      requestSignUp: false, // Key: tells Better Auth to link to existing account, not create new
+    });
+    console.log('[linkOAuthAccount] Result:', result);
+    return result as unknown as { data?: { url: string; redirect: boolean }; error?: { message: string } };
+  } catch (err: any) {
+    console.error('[linkOAuthAccount] Error:', err);
+    // If the error is the account_not_linked type, we need to handle it differently
+    if (err?.message?.includes('already registered') || err?.message?.includes('account_not_linked') || err?.error?.message?.includes('already registered')) {
+      // This happens when the user isn't properly authenticated or session isn't passed
+      return { error: { message: 'SESSION_REQUIRED: Please sign in first, then try linking again.' } };
+    }
+    return { error: { message: err?.message || String(err) } };
+  }
 }
 
 /**
