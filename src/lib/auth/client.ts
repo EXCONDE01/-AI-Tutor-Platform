@@ -119,9 +119,14 @@ export async function deleteAccountClient(password: string) {
 export async function linkOAuthAccount(provider: 'google' | 'github' | 'microsoft') {
   console.log('[linkOAuthAccount] Calling /link-social with provider:', provider);
   // Use authClient.$fetch which properly handles cookies and Neon Auth proxy
+  // callbackURL must be a full URL or path that handles the OAuth callback with state
+  const callbackURL = typeof window !== 'undefined' 
+    ? window.location.origin + '/auth/callback?mode=link' 
+    : '/auth/callback?mode=link';
+  
   const result = await authClient.$fetch('/link-social', {
     method: 'POST',
-    body: { provider, callbackURL: '/' },
+    body: { provider, callbackURL },
   });
   console.log('[linkOAuthAccount] Result:', result);
   return result as unknown as { data?: { url: string; redirect: boolean }; error?: { message: string } };

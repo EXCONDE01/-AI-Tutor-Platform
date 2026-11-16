@@ -9,7 +9,7 @@ function AuthCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/";
-  const mode = searchParams.get("mode") || "signin"; // "signin" or "signup"
+  const mode = searchParams.get("mode") || "signin"; // "signin" | "signup" | "link"
   const error = searchParams.get("error");
 
   useEffect(() => {
@@ -32,6 +32,13 @@ function AuthCallbackContent() {
 
         if (roleResponse.ok) {
           const { role } = await roleResponse.json();
+          
+          // Handle "link" mode - just redirect back to settings
+          if (mode === "link") {
+            router.push("/teacher/settings?linked=google");
+            router.refresh();
+            return;
+          }
           
           if (mode === "signup" && role === "student") {
             // New user from sign-up flow - redirect to role selection/onboarding
