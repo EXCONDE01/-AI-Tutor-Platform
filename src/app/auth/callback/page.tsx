@@ -34,12 +34,30 @@ function AuthCallbackContent() {
       await new Promise(resolve => setTimeout(resolve, 500));
 
       try {
-        // For SIGNUP mode: redirect directly to onboarding WITHOUT calling role API
-        // The role API would call ensureAppUser with default 'student' role
-        // which would create/update user before they select their role
+        // For SIGNUP mode: check if user already has an app account
+        // If they do, redirect to sign-in with error (can't sign up twice)
         if (mode === "signup") {
-          router.push("/onboarding");
-          return;
+          const roleResponse = await fetch("/api/auth/role", {
+            credentials: "include",
+          });
+
+          if (roleResponse.ok) {
+            const { role, needsOnboarding } = await roleResponse.json();
+            
+            // If user has existing role (not needsOnboarding), they already have an account
+            if (role && !needsOnboarding) {
+              router.push(`/sign-in?error=${encodeURIComponent("An account with this email already exists. Please sign in instead.")}`);
+              return;
+            }
+            
+            // New user or re-registration - go to onboarding
+            router.push("/onboarding");
+            return;
+          } else {
+            console.error('[AuthCallback] Role lookup failed:', roleResponse.status);
+            router.push(callbackUrl);
+            return;
+          }
         }
 
         // SIGNIN mode: check role and redirect to appropriate dashboard
