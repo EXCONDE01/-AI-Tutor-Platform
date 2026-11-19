@@ -1,126 +1,179 @@
 "use client";
 
 import * as React from "react";
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
+import { Plus, BookOpen, AlertCircle, Search, Settings, Globe, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BookOpen, Clock, Trophy, Plus, LogOut, Loader2, CheckCircle, FileText, Search, Upload, Globe } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 import { StudentClassesSkeleton } from "@/components/ui/page-skeletons";
+import { ClassCard } from "@/components/student/classes/ClassCard";
+import { JoinClassDialog } from "@/components/student/classes/JoinClassDialog";
+import { ProviderPanel, ImportPreview } from "@/components/student/classes/ImportProviders";
+import { matchesStudentClassQuery, type StudentEnrolledClass } from "@/lib/classes/format";
+
+interface FileItem {
+  id: string;
+  name: string;
+  mimeType?: string;
+  file?: { mimeType?: string };
+}
 
 export default function StudentClassesPage() {
+  // Classes state
   const [loading, setLoading] = useState(true);
-  const [classes, setClasses] = useState<any[]>([]);
-  const [showJoinForm, setShowJoinForm] = useState(false);
-  const [joinCode, setJoinCode] = useState("");
-  const [joining, setJoining] = useState(false);
-  const [leavingId, setLeavingId] = useState<string | null>(null);
-  const [joinSuccess, setJoinSuccess] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState("classes");
+  const [classes, setClasses] = useState<StudentEnrolledClass[]>([]);
+  const [classesError, setClassesError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
-  // Import state
-  const [importLoading, setImportLoading] = useState(false);
-  const [driveFiles, setDriveFiles] = useState<any[]>([]);
-  const [onedriveFiles, setOnedriveFiles] = useState<any[]>([]);
+  // Join class dialog
+  const [joinDialogOpen, setJoinDialogOpen] = useState(false);
+
+  // Import state - per provider
+  const [driveLoading, setDriveLoading] = useState(false);
+  const [driveFiles, setDriveFiles] = useState<FileItem[]>([]);
   const [driveSearch, setDriveSearch] = useState("");
-  const [onedriveSearch, setOnedriveSearch] = useState("");
-  const [importedContent, setImportedContent] = useState<string | null>(null);
-  const [importError, setImportError] = useState<string | null>(null);
+  const [driveError, setDriveError] = useState<string | null>(null);
+  const [driveNotConnected, setDriveNotConnected] = useState(false);
 
-  useEffect(() => {
-    const loadClasses = async () => {
-      try {
-        const res = await fetch("/api/student/classes", { credentials: "include" });
-        if (res.ok) {
-          const data = await res.json();
-          setClasses(data.classes || []);
-        }
-      } catch (error) {
-        console.error("Failed to load classes:", error);
-      } finally {
-        setLoading(false);
+  const [onedriveLoading, setOnedriveLoading] = useState(false);
+  const [onedriveFiles, setOnedriveFiles] = useState<FileItem[]>([]);
+  const [onedriveSearch, setOnedriveSearch] = useState("");
+  const [onedriveError, setOnedriveError] = useState<string | null>(null);
+  const [onedriveNotConnected, setOnedriveNotConnected] = useState(false);
+
+  // Import preview
+  const [importedContent, setImportedContent] = useState<string | null>(null);
+  const [copying, setCopying] = useState(false);
+
+  // Importing file tracking (per provider)
+  const [importingDriveFileId, setImportingDriveFileId] = useState<string | null>(null);
+  const [importingOnedriveFileId, setImportingOnedriveFileId] = useState<string | null>(null);
+
+  // Active tab
+  const [activeTab, setActiveTab] = useState<"classes" | "import">("classes");
+
+  const handleTabChange = (value: "classes" | "import") => {
+    setActiveTab(value);
+  };
+
+  // Load classes
+  const loadClasses = useCallback(async () => {
+    try {
+      const res = await fetch("/api/student/classes", { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        setClasses(data.classes || []);
+        setClassesError(null);
+      } else {
+        const err = await res.json().catch(() => ({ error: "Failed to load classes" }));
+        setClassesError(err.error || "Couldn't load your classes");
+        setClasses([]);
       }
-    };
-    loadClasses();
+    } catch (error) {
+      console.error("Failed to load classes:", error);
+      setClassesError("Couldn't load your classes");
+      setClasses([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const handleJoin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!joinCode.trim()) return;
-    setJoining(true);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial async fetch; state updates occur after await
+    void loadClasses();
+  }, [loadClasses]);
+
+  // Handle join class
+  const handleJoinClass = async (joinCode: string) => {
     try {
       const res = await fetch("/api/student/classes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ joinCode: joinCode.trim().toUpperCase() }),
+        body: JSON.stringify({ joinCode }),
       });
+
+      const data = await res.json().catch(() => ({}));
+
       if (res.ok) {
-        const data = await res.json();
-        setJoinSuccess(data.message || "Joined class successfully");
-        setJoinCode("");
-        setShowJoinForm(false);
-        // Reload classes
-        const res2 = await fetch("/api/student/classes", { credentials: "include" });
-        if (res2.ok) {
-          const data2 = await res2.json();
-          setClasses(data2.classes || []);
-        }
-      } else {
-        const err = await res.json();
-        alert(err.error || "Failed to join class");
+        await loadClasses();
+        toast({
+          title: "Joined class",
+          description: data.className
+            ? `You're now enrolled in ${data.className}.`
+            : data.message || "Class joined successfully.",
+          variant: "success",
+        });
+        return { success: true, className: data.className as string | undefined };
       }
+
+      return { success: false, error: data.error || "Failed to join class" };
     } catch {
-      alert("Failed to join class");
-    } finally {
-      setJoining(false);
+      return { success: false, error: "Failed to join class" };
     }
   };
 
-  const handleLeave = async (classId: string) => {
-    if (!confirm("Are you sure you want to leave this class?")) {
-      return;
-    }
-    setLeavingId(classId);
+  // Handle leave class
+  const handleLeaveClass = async (classId: string) => {
     try {
       const res = await fetch(`/api/student/classes?id=${classId}`, {
         method: "DELETE",
         credentials: "include",
       });
       if (res.ok) {
-        setClasses(classes.filter((c) => c.id !== classId));
+        setClasses((prev) => prev.filter((c) => c.id !== classId));
+        toast({ title: "Left class", description: "You have left the class. You can rejoin with the join code.", variant: "success" });
       } else {
         const err = await res.json();
-        alert(err.error || "Failed to leave class");
+        throw new Error(err.error || "Failed to leave class");
       }
-    } catch {
-      alert("Failed to leave class");
-    } finally {
-      setLeavingId(null);
+    } catch (error) {
+      toast({ title: "Failed to leave class", description: error instanceof Error ? error.message : "Please try again", variant: "destructive" });
+      throw error;
     }
   };
 
+  // Load Drive files
   const loadDriveFiles = async (searchQuery?: string) => {
+    setDriveLoading(true);
+    setDriveError(null);
+    setDriveNotConnected(false);
     try {
-      const url = searchQuery 
+      const url = searchQuery
         ? `/api/student/import-drive?action=search&q=${encodeURIComponent(searchQuery)}`
         : `/api/student/import-drive?action=list`;
       const res = await fetch(url, { credentials: "include" });
       if (res.ok) {
         const data = await res.json();
         setDriveFiles(data.files || []);
+        setDriveNotConnected(false);
+      } else if (res.status === 400) {
+        const err = await res.json().catch(() => ({}));
+        if (err.error?.includes("not connected") || err.error?.includes("Google account")) {
+          setDriveNotConnected(true);
+          setDriveFiles([]);
+        } else {
+          setDriveError(err.error || "Failed to load Google Drive files");
+        }
       } else {
-        setImportError("Failed to load Google Drive files");
+        setDriveError("Failed to load Google Drive files");
       }
     } catch {
-      setImportError("Failed to load Google Drive files");
+      setDriveError("Failed to load Google Drive files");
+    } finally {
+      setDriveLoading(false);
     }
   };
 
+  // Load OneDrive files
   const loadOnedriveFiles = async (searchQuery?: string) => {
+    setOnedriveLoading(true);
+    setOnedriveError(null);
+    setOnedriveNotConnected(false);
     try {
       const url = searchQuery
         ? `/api/student/import-onedrive?action=search&q=${encodeURIComponent(searchQuery)}`
@@ -129,363 +182,262 @@ export default function StudentClassesPage() {
       if (res.ok) {
         const data = await res.json();
         setOnedriveFiles(data.files || []);
+        setOnedriveNotConnected(false);
+      } else if (res.status === 400) {
+        const err = await res.json().catch(() => ({}));
+        if (err.error?.includes("not connected") || err.error?.includes("Microsoft account")) {
+          setOnedriveNotConnected(true);
+          setOnedriveFiles([]);
+        } else {
+          setOnedriveError(err.error || "Failed to load OneDrive files");
+        }
       } else {
-        setImportError("Failed to load OneDrive files");
+        setOnedriveError("Failed to load OneDrive files");
       }
     } catch {
-      setImportError("Failed to load OneDrive files");
+      setOnedriveError("Failed to load OneDrive files");
+    } finally {
+      setOnedriveLoading(false);
     }
   };
 
-  const handleImportFile = async (fileId: string, source: 'drive' | 'onedrive') => {
-    setImportLoading(true);
-    setImportError(null);
+  // Handle file import
+  const handleImportFile = async (fileId: string, source: "drive" | "onedrive") => {
+    if (source === "drive") {
+      setImportingDriveFileId(fileId);
+    } else {
+      setImportingOnedriveFileId(fileId);
+    }
+
     try {
-      const url = source === 'drive'
+      const url = source === "drive"
         ? `/api/student/import-drive?action=download&fileId=${fileId}`
         : `/api/student/import-onedrive?action=download&fileId=${fileId}`;
+
       const res = await fetch(url, { credentials: "include" });
       if (res.ok) {
         const data = await res.json();
         if (data.content) {
           setImportedContent(data.content);
-          setImportError(null);
+          toast({ title: "Imported", description: "Content ready to copy.", variant: "success" });
         } else if (data.downloadUrl) {
-          // For PDFs and other binary files, open in new tab
-          window.open(data.downloadUrl, "_blank");
-          setImportError("File opened in new tab. Please copy content manually.");
+          // PDF or binary - open in new tab
+          window.open(data.downloadUrl, "_blank", "noopener,noreferrer");
+          toast({
+            title: "Opened in new tab",
+            description: "PDF files open in a new tab. Download it from there to use the content.",
+            variant: "default"
+          });
         }
       } else {
         const err = await res.json();
-        setImportError(err.error || "Failed to import file");
+        throw new Error(err.error || "Failed to import file");
       }
-    } catch {
-      setImportError("Failed to import file");
+    } catch (error) {
+      toast({
+        title: "Import failed",
+        description: error instanceof Error ? error.message : "Please try again",
+        variant: "destructive"
+      });
     } finally {
-      setImportLoading(false);
+      if (source === "drive") {
+        setImportingDriveFileId(null);
+      } else {
+        setImportingOnedriveFileId(null);
+      }
     }
   };
 
-  const handleDriveSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    loadDriveFiles(driveSearch);
+  // Handle copy to clipboard
+  const handleCopy = async () => {
+    if (!importedContent) return;
+    setCopying(true);
+    try {
+      await navigator.clipboard.writeText(importedContent);
+      toast({ title: "Copied", description: "Content copied to clipboard.", variant: "success" });
+    } catch {
+      toast({ title: "Copy failed", description: "Could not copy to clipboard.", variant: "destructive" });
+    } finally {
+      setCopying(false);
+    }
   };
 
-  const handleOnedriveSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    loadOnedriveFiles(onedriveSearch);
-  };
+  // Filter classes client-side
+  const filteredClasses = classes.filter((cls) => matchesStudentClassQuery(cls, searchQuery));
 
+  // Loading state
   if (loading) {
     return <StudentClassesSkeleton />;
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold mb-2">My Classes</h1>
-          <p className="text-muted-foreground">View and manage your enrolled classes</p>
+          <h1 className="text-3xl font-bold tracking-tight">My Classes</h1>
+          <p className="text-muted-foreground">Classes you&apos;re enrolled in and materials for tutoring</p>
         </div>
-        <Button onClick={() => setShowJoinForm(true)} className="flex-1 lg:flex-none">
+        <Button onClick={() => setJoinDialogOpen(true)}>
           <Plus className="mr-2 h-5 w-5" />
-          Join Class
+          Join class
         </Button>
       </div>
 
-      {showJoinForm && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Join a Class</CardTitle>
-            <p className="text-sm text-muted-foreground">Enter the join code provided by your teacher</p>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleJoin} className="space-y-4">
-              <div className="space-y-2">
-                <Label>Join Code</Label>
-                <Input
-                  value={joinCode}
-                  onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                  placeholder="e.g. ABC123XY"
-                  maxLength={8}
-                  required
-                  disabled={joining}
-                />
-              </div>
-              <div className="flex gap-3 pt-4">
-                <Button type="button" variant="outline" onClick={() => setShowJoinForm(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={joining || !joinCode.trim()}>
-                  {joining ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Join Class"}
-                </Button>
-              </div>
-            </form>
+      {/* Classes error state */}
+      {classesError && activeTab === "classes" && (
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardContent className="flex items-center gap-3 p-4">
+            <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0" />
+            <div>
+              <p className="font-medium text-destructive">Couldn&apos;t load your classes</p>
+              <p className="text-sm text-muted-foreground">{classesError}</p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setClassesError(null);
+                setLoading(true);
+                void loadClasses();
+              }}
+              className="ml-auto"
+            >
+              Try again
+            </Button>
           </CardContent>
         </Card>
       )}
 
-      {joinSuccess && (
-        <div className="flex items-center gap-2 p-4 bg-green-50 border border-green-200 rounded-lg text-green-800">
-          <CheckCircle className="h-5 w-5 flex-shrink-0" />
-          <span>{joinSuccess}</span>
-          <Button variant="ghost" size="icon" onClick={() => setJoinSuccess(null)} className="ml-auto">
-            <span className="sr-only">Dismiss</span>
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-          </Button>
-        </div>
-      )}
-
-      {/* Tabs for Classes and Import */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2">
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
+        <TabsList className="grid w-full grid-cols-2 sm:w-auto sm:inline-grid">
           <TabsTrigger value="classes">My Classes</TabsTrigger>
-          <TabsTrigger value="import">Import from Drive</TabsTrigger>
+          <TabsTrigger value="import">Import materials</TabsTrigger>
         </TabsList>
 
+        {/* My Classes Tab */}
         <TabsContent value="classes">
-          {classes.length === 0 && !showJoinForm && (
+          {/* Search */}
+          {filteredClasses.length > 0 && (
+            <div className="mb-4">
+              <Input
+                placeholder="Search classes by name, subject, or teacher..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="max-w-md"
+              />
+            </div>
+          )}
+
+          {/* Empty state */}
+          {filteredClasses.length === 0 && !classesError && (
             <Card>
               <CardContent className="py-12 text-center text-muted-foreground">
-                <BookOpen className="h-8 w-8 mx-auto mb-4 opacity-50" />
-                <p>No classes yet.</p>
-                <p className="text-sm mt-2">Click &#34;Join Class&#34; and enter a code from your teacher to get started.</p>
+                <BookOpen className="h-10 w-10 mx-auto mb-4 opacity-50" />
+                <p className="font-medium">You&apos;re not in any classes yet</p>
+                <p className="text-sm mt-1">
+                  {searchQuery ? "No classes match your search." : "Join a class to start learning with AI tutoring."}
+                </p>
+                <Button className="mt-4" onClick={() => setJoinDialogOpen(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Join a class
+                </Button>
               </CardContent>
             </Card>
           )}
 
-          {classes.length > 0 && (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {classes.map((cls) => (
-                <Card key={cls.id} className="p-6">
-                  <div className="flex items-start justify-between gap-4 mb-4">
-                    <div>
-                      <h3 className="text-xl font-semibold mb-2">{cls.name}</h3>
-                      <p className="text-muted-foreground mb-4">{cls.teacherName || cls.teacher}</p>
-                      <Badge variant="outline" className="text-xs">{cls.subject}</Badge>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-2xl font-bold text-primary">{cls.progress || 0}%</div>
-                      <p className="text-xs text-muted-foreground">Complete</p>
-                    </div>
-                  </div>
-                  <div className="flex-1">
-                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div className="h-full bg-primary transition-all duration-500" style={{ width: `${cls.progress || 0}%` }} />
-                    </div>
-                  </div>
-                  <div className="mt-4 flex gap-2">
-                    <Button variant="outline" size="sm" className="flex-1">
-                      View Sessions
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => handleLeave(cls.id)}
-                      disabled={leavingId === cls.id}
-                      className="flex-1"
-                    >
-                      {leavingId === cls.id ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
-                        <>
-                          <LogOut className="mr-2 h-4 w-4" />
-                          Leave
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </Card>
+          {/* Classes grid */}
+          {filteredClasses.length > 0 && (
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {filteredClasses.map((cls) => (
+                <ClassCard key={cls.id} class={cls} onLeave={handleLeaveClass} />
               ))}
             </div>
           )}
         </TabsContent>
 
+        {/* Import Materials Tab */}
         <TabsContent value="import">
           <div className="space-y-6">
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <div className="flex items-center gap-3">
-                <Upload className="h-6 w-6 text-blue-600" />
-                <div>
-                  <p className="font-medium text-blue-900">Import Reading Passages</p>
-                  <p className="text-sm text-blue-700">
-                    Connect your cloud storage in Settings, then import documents from Google Drive or OneDrive
-                    to use as reading material for tutoring sessions.
-                  </p>
+            {/* Intro card */}
+            <Card className="border-blue-200 bg-blue-50">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <Upload className="h-6 w-6 text-blue-600 flex-shrink-0" />
+                  <div>
+                    <p className="font-medium text-blue-900">Import Reading Passages</p>
+                    <p className="text-sm text-blue-700">
+                      Connect your cloud storage in Settings, then import documents from Google Drive or OneDrive
+                      to use as reading material for tutoring sessions.
+                    </p>
+                  </div>
+                  <Link href="/student/settings" className="ml-auto text-sm font-medium text-blue-700 hover:underline flex items-center gap-1">
+                    <Settings className="h-4 w-4" />
+                    Manage connections
+                  </Link>
                 </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
 
+            {/* Provider panels */}
             <div className="grid gap-6 md:grid-cols-2">
-              {/* Google Drive Tab */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Globe className="h-5 w-5 text-green-500" />
-                    Google Drive
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <form onSubmit={handleDriveSearch} className="flex gap-2">
-                    <Input
-                      placeholder="Search files..."
-                      value={driveSearch}
-                      onChange={(e) => setDriveSearch(e.target.value)}
-                      className="flex-1"
-                    />
-                    <Button type="submit" disabled={importLoading}>
-                      <Search className="h-4 w-4" />
-                    </Button>
-                  </form>
+              {/* Google Drive */}
+              <ProviderPanel
+                provider="drive"
+                title="Google Drive"
+                iconColor="text-green-500"
+                icon={<Globe className="h-5 w-5" />}
+                onLoadFiles={loadDriveFiles}
+                onSearch={(e) => { e.preventDefault(); loadDriveFiles(driveSearch); }}
+                searchQuery={driveSearch}
+                setSearchQuery={setDriveSearch}
+                files={driveFiles}
+                loading={driveLoading}
+                error={driveError}
+                notConnected={driveNotConnected}
+                onImportFile={(id) => handleImportFile(id, "drive")}
+                importingFileId={importingDriveFileId}
+              />
 
-                  <Button 
-                    variant="outline" 
-                    onClick={() => loadDriveFiles()}
-                    disabled={importLoading}
-                    className="w-full gap-2"
-                  >
-                    <Loader2 className="h-4 w-4" />
-                    Load All Documents
-                  </Button>
-
-                  {importLoading && <div className="text-center py-4"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></div>}
-
-                  {driveFiles.length > 0 && (
-                    <div className="max-h-96 overflow-y-auto space-y-2">
-                      {driveFiles.map((file: any) => (
-                        <div key={file.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50">
-                          <div className="flex items-center gap-3 flex-1 min-w-0">
-                            <FileText className="h-5 w-5 text-green-500" />
-                            <div className="min-w-0">
-                              <p className="font-medium truncate">{file.name}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {file.mimeType === 'application/vnd.google-apps.document' ? 'Google Doc' : 
-                                 file.mimeType === 'text/plain' ? 'Text File' : 'PDF'}
-                              </p>
-                            </div>
-                          </div>
-                          <Button 
-                            size="sm" 
-                            onClick={() => handleImportFile(file.id, 'drive')}
-                            disabled={importLoading}
-                          >
-                            Import
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {driveFiles.length === 0 && !importLoading && (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p>No documents found</p>
-                      <p className="text-sm">Search or click &#34;Load All Documents&#34;</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* OneDrive Tab */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Globe className="h-5 w-5 text-blue-500" />
-                    OneDrive
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <form onSubmit={handleOnedriveSearch} className="flex gap-2">
-                    <Input
-                      placeholder="Search files..."
-                      value={onedriveSearch}
-                      onChange={(e) => setOnedriveSearch(e.target.value)}
-                      className="flex-1"
-                    />
-                    <Button type="submit" disabled={importLoading}>
-                      <Search className="h-4 w-4" />
-                    </Button>
-                  </form>
-
-                  <Button 
-                    variant="outline" 
-                    onClick={() => loadOnedriveFiles()}
-                    disabled={importLoading}
-                    className="w-full gap-2"
-                  >
-                    <Loader2 className="h-4 w-4" />
-                    Load All Documents
-                  </Button>
-
-                  {importLoading && <div className="text-center py-4"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></div>}
-
-                  {onedriveFiles.length > 0 && (
-                    <div className="max-h-96 overflow-y-auto space-y-2">
-                      {onedriveFiles.map((file: any) => (
-                        <div key={file.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50">
-                          <div className="flex items-center gap-3 flex-1 min-w-0">
-                            <FileText className="h-5 w-5 text-blue-500" />
-                            <div className="min-w-0">
-                              <p className="font-medium truncate">{file.name}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {file.file?.mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ? 'Word Document' : 
-                                 file.file?.mimeType === 'text/plain' ? 'Text File' : 'PDF'}
-                              </p>
-                            </div>
-                          </div>
-                          <Button 
-                            size="sm" 
-                            onClick={() => handleImportFile(file.id, 'onedrive')}
-                            disabled={importLoading}
-                          >
-                            Import
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {onedriveFiles.length === 0 && !importLoading && (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p>No documents found</p>
-                      <p className="text-sm">Search or click &#34;Load All Documents&#34;</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+              {/* OneDrive */}
+              <ProviderPanel
+                provider="onedrive"
+                title="OneDrive"
+                iconColor="text-blue-500"
+                icon={<Globe className="h-5 w-5" />}
+                onLoadFiles={loadOnedriveFiles}
+                onSearch={(e) => { e.preventDefault(); loadOnedriveFiles(onedriveSearch); }}
+                searchQuery={onedriveSearch}
+                setSearchQuery={setOnedriveSearch}
+                files={onedriveFiles}
+                loading={onedriveLoading}
+                error={onedriveError}
+                notConnected={onedriveNotConnected}
+                onImportFile={(id) => handleImportFile(id, "onedrive")}
+                importingFileId={importingOnedriveFileId}
+              />
             </div>
 
-            {/* Imported Content Preview */}
+            {/* Imported content preview */}
             {importedContent && (
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle>Imported Content</CardTitle>
-                    <Button variant="ghost" size="sm" onClick={() => setImportedContent(null)}>
-                      Clear
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="max-h-96 overflow-y-auto p-4 border rounded-lg bg-muted/30">
-                    <pre className="whitespace-pre-wrap text-sm">{importedContent}</pre>
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Copy this content to use in a tutoring session or save as an artifact.
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-
-            {importError && (
-              <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive">
-                {importError}
-              </div>
+              <ImportPreview
+                content={importedContent}
+                onClear={() => setImportedContent(null)}
+                onCopy={handleCopy}
+                copying={copying}
+              />
             )}
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Join Class Dialog */}
+      <JoinClassDialog
+        open={joinDialogOpen}
+        onOpenChange={setJoinDialogOpen}
+        onJoin={handleJoinClass}
+      />
     </div>
   );
 }

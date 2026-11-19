@@ -1,79 +1,107 @@
 # 📋 Master Project Plan: AI Tutor for Teachers & Students (Web + PWA)
 
+**Last updated:** 2026-11-19 · **Release:** production pilot build (pre-pivot baseline)
+**Production:** https://ai-tutor-platform-exconde.vercel.app
+
+| Dimension | State |
+|-----------|-------|
+| Phases 1-7 (AI-tutor-chat product) | ✅ Complete — **deployed baseline** |
+| Pivot: video-call + post-call AI guidance | 🟡 **PLANNING (not approved/implemented)** — **Q1–Q8 answered**, Phase 0 spike (100ms + Capacitor WebRTC) required before approval |
+| Deployed teacher surfaces (pre-pivot) | dashboard, classes, classes/[id], sessions, sessions/[id], sessions/new, analytics |
+| Quality gates (pre-pivot) | type-check clean · lint 0 errors (8 pre-existing warnings) · 152 unit tests passing · production build green |
+| Working tree | Feature work uncommitted (production reflects the deployed pre-pivot builds) |
+
 ---
 
-## **1. Project Scope**
+## **1. Project Scope** (redefined for pivot)
 
-Build a **multi-tenant, PWA-enabled AI tutoring platform** for K-12 education:
+Build a **multi-tenant, PWA-enabled video tutoring platform** for K-12 education with **post-call AI guidance grounded in the lecture**.
 
 | User | Capabilities |
 |------|--------------|
-| **Teachers** | Configure tutor personas per class, monitor student sessions live, intervene in real-time, view analytics, push notifications, export worksheets/quizzes to Google/Microsoft 365 |
-| **Students** | Chat with AI tutor via LMS SSO (Canvas, Google Classroom, Schoology) or direct login, works offline, installable on Chromebooks/iPads/phones, receive push reminders |
-| **Parents** | Read-only access to child's progress, COPPA consent management |
-| **Admins** | District/school setup, compliance audit logs, data retention policies |
+| **Teachers** | Create/join live in-app video calls with students (class-scoped, 1:1 ad-hoc MVP); access post-call lecture artifacts (notes, transcripts, materials); view student guidance history; analytics on call duration, engagement, guidance usage |
+| **Students** | Join teacher-initiated video calls via LMS SSO (Canvas, Google Classroom, Schoology) or direct login; after call ends, ask AI for guidance **grounded in that call's lecture** (notes/transcript/materials); works offline for guidance chat; installable on Chromebooks/iPads/phones; receive push reminders |
+| **Parents** | Read-only access to child's call history, guidance usage, progress; COPPA consent management for recordings/transcripts |
+| **Admins** | District/school setup, compliance audit logs, data retention policies, recording/transcript governance |
 
-**Compliance**: FERPA/COPPA — audit logs, retention automation, parent consent, no training on student data.
+**Compliance**: FERPA/COPPA — audit logs, retention automation, parent consent (esp. for recordings/transcripts), access control/RLS, **no training on student data**. Recording/transcript policies **pending decision (Q4)**.
+
+**English only.** Free tiers only (Neon, Vercel, OpenRouter `:free`/`openrouter/free`, free-tier video/infra for MVP).
 
 ---
 
-## **2. Architecture**
+## **2. Architecture** (target for pivot — **proposed/pending**)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                    NEXT.JS + PWA (VERCEL)                                   │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
 │  │  TEACHER DASHBOARD                                                   │   │
-│  │  • Class roster (LMS sync) • Tutor config (persona, guardrails)    │   │
-│  │  • Live session monitor (Neon Realtime) • Intervention controls    │   │
-│  │  • Analytics (duration, topics, tokens) • Grade passback status    │   │
+│  │  • Class roster (LMS sync) • Video session launcher (class-scoped) │   │
+│  │  • Live call monitor (Neon Realtime) • Call lifecycle controls     │   │
+│  │  • Lecture artifacts (notes/materials) upload & management         │   │
+│  │  • Post-call analytics (duration, engagement, guidance usage)      │   │
 │  │  • Export tools (Google Docs/Forms/Slides, Microsoft 365)          │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │  STUDENT TUTOR CHAT                                                  │   │
-│  │  • Streaming chat (useChat → Neon Function) • Message history      │   │
-│  │  • Offline queue (IndexedDB + Service Worker sync)                 │   │
-│  │  • Push notifications (Web Push API) • Artifact viewer             │   │
-│  │  • PWA: installable, standalone, background sync                   │   │
+│  │  STUDENT VIDEO CALL + POST-CALL GUIDANCE                             │   │
+│  │  • In-app video call join (provider SDK) • Call end → guidance UI  │   │
+│  │  • Guidance chat (useChat → /api/ai/guidance) grounded in lecture  │   │
+│  │  • Offline queue (IndexedDB + SW sync) for guidance messages       │   │
+│  │  • Push notifications (Web Push API) • PWA: installable/standalone │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │  • LTI 1.3 Launch + Deep Linking + NRPS/AGS                               │
 │  • OAuth: Google Workspace / Microsoft 365                                │
-│  • Neon Auth (Managed Better Auth) — multi-role: teacher | student       │
+│  • Neon Auth (Managed Better Auth) — teacher | student | parent | admin │
 └─────────────────────────────────────────┬───────────────────────────────────┘
                                           │ HTTPS + JWT (Bearer / ?token=)
                                           ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                      NEON FUNCTIONS (TUTOR AGENT)                           │
-│  • Hono server on Neon Compute (15-min streaming, WebSocket/SSE native)    │
-│  • Module-scope pg Pool + attachDatabasePool (no idle disconnects)         │
-│  • JWT verification via NEON_AUTH_JWKS_URL                                 │
-│  • CORS + SSE heartbeat (: ping\n\n every 25s)                             │
-│  • Vercel AI SDK streamText + ToolLoopAgent                                │
-│  • OpenRouter: claude-3.5-sonnet (primary) → gpt-4o-mini → gemini-flash   │
-│  • Tools: searchKnowledgeBase (RAG), getAssignmentContext, exportToGoogle* │
+│                    TUTOR AGENT (NEXT.JS ROUTE HANDLERS)                      │
+│  • Node runtime on Vercel (SSE streaming, no idle disconnects)             │
+│  • Pooled Neon connection via @neondatabase/serverless                     │
+│  • Neon Auth session/JWT verification                                      │
+│  • SSE heartbeat while streaming                                           │
+│  • Vercel AI SDK streamText                                                │
+│  • OpenRouter FREE models only (ordered :free fallbacks, vision-aware)     │
+│  • Tools: searchLectureContext (RAG over lecture artifacts),               │
+│           getCallContext (call metadata, artifacts)                        │
 │  • Neon Realtime subscriptions for live teacher monitoring                 │
 └─────────────────────────────────────────┬───────────────────────────────────┘
-                                          │ Branches together (per teacher/class)
+                                          │ Branches together (per environment)
                                           ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                    NEON LAKEBASE POSTGRES                                   │
 │  • Multi-tenant hierarchy: districts → schools → teachers → classes → students │
-│  • Core: tutor_sessions, messages, interventions, audit_logs               │
+│  • Video domain: video_sessions, call_records, lecture_artifacts,          │
+│      transcript_chunks, guidance_sessions, guidance_messages               │
+│  • Legacy AI-tutor-chat: tutor_sessions, messages, interventions,          │
+│      session_summaries (to be migrated/repurposed per Q7)                  │
 │  • LTI: platforms, deployments, nrps_cache, ags_line_items                 │
 │  • Artifacts: generated_artifacts, export_jobs, oauth_tokens               │
 │  • Compliance: consent_records, data_deletion_requests, retention_policies │
 │  • RLS policies for tenant isolation                                       │
-│  • pgvector for curriculum/standards RAG                                   │
+│  • pgvector for lecture-context RAG                                        │
 └─────────────────────────────────────────────────────────────────────────────┘
                                           │
-                    ┌───────────────────────┼───────────────────────┐
-                    ▼                       ▼                       ▼
-            ┌──────────────┐         ┌──────────────┐         ┌──────────────┐
-            │ NEON REALTIME│         │ NEON OBJECT  │         │  OPENROUTER  │
-            │ (sealed live │         │ STORAGE      │         │  (LLM GATEWAY)│
-            │  queries)    │         │ (artifacts)  │         └──────────────┘
-            └──────────────┘         └──────────────┘
+                     ┌───────────────────────┼───────────────────────┐
+                     ▼                       ▼                       ▼
+             ┌──────────────┐         ┌──────────────┐         ┌──────────────┐
+             │ NEON REALTIME│         │ NEON OBJECT  │         │  OPENROUTER  │
+             │ (mirror      │         │ STORAGE      │         │  (LLM GATEWAY)│
+             │  tables)     │         │ (lecture     │         └──────────────┘
+             └──────────────┘         │  artifacts,  │
+                                      │  recordings) │
+                                      └──────────────┘
 ```
+
+**Video provider (pending Q2):** Managed SDK (100ms, Daily, LiveKit) — room/token flow, TURN/signaling, webhooks for lifecycle. Self-host/raw WebRTC high risk on Vercel.
+
+**Lecture context capture (pending Q3):** L1 teacher notes/materials upload → Neon Object Storage + embeddings; L2 provider post-call transcript ingestion; L3 upload+transcribe (Whisper in Neon Function); L4 live transcript (defer). RAG over `lecture_artifacts` + `transcript_chunks` (pgvector).
+
+**Guidance endpoint:** `/api/ai/guidance` — unlocked after call end + context-ready, constrained guidance persona, OpenRouter free models, filtering/audit, student + teacher visibility per Q6.
+
+**Legacy AI-tutor-chat components** (`/api/ai/chat`, `TutorChat`, teacher live monitor, interventions) — **to be migrated/repurposed per Q7**. Current deployment reflects this legacy system.
 
 ---
 
@@ -81,224 +109,357 @@ Build a **multi-tenant, PWA-enabled AI tutoring platform** for K-12 education:
 
 | Category | Decision | Rationale |
 |----------|----------|-----------|
-| **Platform** | Web + PWA (`next-pwa`, Workbox, Web Push) | Single codebase, works on Chromebooks/iPads/phones, installable, offline-capable |
-| **LTI Library** | `@lti-tool/core` + `@lti-tool/postgresql` + `@lti-tool/hono` | Neon-native Postgres storage, Hono for Functions, full LTI Advantage |
-| **Tutor Framework** | Vercel AI SDK `streamText` + `ToolLoopAgent` | Native streaming, Neon Function compatible, low complexity |
-| **Primary Model** | `anthropic/claude-3.5-sonnet` via **OpenRouter** | Best tool-calling reliability; free tier for dev; pay-as-you-go |
-| **Fallback Models** | `openai/gpt-4o-mini`, `google/gemini-flash-1.5`, free tier models | Cost-effective fallbacks; auto-fallback on 429/5xx |
-| **Auth** | Neon Auth (Managed Better Auth) | Branches with DB, JWT verification in Functions, OIDC for LTI |
-| **Streaming** | SSE with heartbeat (`: ping\n\n` every 25s) | Survives Cloudflare/Vercel proxy timeouts |
-| **Realtime** | Neon Realtime sealed queries | Teacher monitors student sessions live without polling |
-| **Storage** | Neon Object Storage (S3-compatible) | Branches with DB, presigned URLs for student downloads |
-| **Migrations** | `drizzle-kit generate` + `migrate` on `DATABASE_URL_UNPOOLED` | Per AGENTS.md: never `push` |
-| **Offline** | Service Worker + IndexedDB outbox queue | Students draft messages offline, sync on reconnect |
-| **Push** | Web Push API + VAPID | Assignment reminders, teacher interventions, session alerts |
+| **Framework** | Next.js `16.4.6` (App Router) + React `19.3.1`, TypeScript `5.7` | Server components + route handlers on Vercel; current majors in production |
+| **PWA** | Hand-written service worker (`public/sw.js`) + `manifest.json` + `offline.html` | No `next-pwa`/Workbox; cache-first static, network-first API, offline fallback, background sync |
+| **Native shell** | Capacitor `8` (`@capacitor/core`, `android`, `ios`, push/local notifications, keyboard, splash) loading live site | Live-server approach (not static export); `cap:sync` / `cap:run:*` scripts |
+| **LTI Library** | In-house `src/lib/lti` (`oidc.ts`, `platform.ts`, `jwt.ts`, `keys.ts`, `nrps.ts`, `ags.ts`, `ags-client.ts`, `validation.ts`) | Full LTI 1.3 + Deep Linking + NRPS + AGS without third-party; keys/JWKS controlled |
+| **Tutor Framework** | Vercel AI SDK `ai` v5 (`streamText`) + `@ai-sdk/react` `useChat` | Native streaming through route handlers |
+| **Models** | **OpenRouter free models only** — `openrouter/free` plus `:free` ids, ordered fallbacks in `src/lib/ai/openrouter.ts`, `assertFreeModel()` rejects anything else | Zero LLM spend during pilot; vision-capable free models when images present |
+| **Auth** | Neon Auth (`@neon/auth`, Managed Better Auth) + `ensureAppUser()` provisioning | Branches with DB; OIDC consumed by LTI launch route |
+| **Streaming** | SSE from `app/api/ai/*` with heartbeats | Survives Vercel/proxy idle timeouts |
+| **Realtime** | Neon Realtime (`@neon/realtime`, `-react`, `-drizzle`) over **RLS-free mirror tables** (`teacher_active_sessions_realtime`, `session_messages_realtime`) kept in sync by triggers in migration `0013` | Neon Realtime rejects relations with RLS, views, matviews, set-returning functions; mirrors are supported workaround. Polling fallback retained |
+| **Storage** | Neon Object Storage via `@aws-sdk/client-s3` + presigner (`src/lib/object-storage`) | S3-compatible, presigned URLs, branches with DB |
+| **Database** | Neon Lakebase Postgres + Drizzle ORM `0.45` / `drizzle-kit 0.31` | Typed schema in `db/schema`, SQL migrations committed |
+| **Migrations** | `npm run db:generate` then `npm run db:migrate` (unpooled URL); migrations `0000`-`0013` | Per AGENTS.md: **never** `push` |
+| **Offline** | IndexedDB (`idb`) outbox queue + service-worker background sync | Students draft guidance messages offline, sync on reconnect |
+| **Push** | Web Push API + VAPID (`web-push`) and Capacitor push notifications | Assignment reminders, teacher interventions, session alerts |
+| **Testing** | Vitest `5.1` (unit), Playwright `1.65` (e2e) | `npm test`, `npm run test:e2e` |
+
+### **Decisions Answered (Pivot-Specific — Awaiting Phase 0 Spike Validation)**
+
+| # | Decision | Choice | Status |
+|---|----------|--------|--------|
+| Q1 | Session scope: 1:1 vs group; ad-hoc vs scheduled | **1:1 ad-hoc only (MVP)** | ✅ Answered |
+| Q2 | Video provider (managed SDK) | **100ms** — bundled free tier (10k call min + 300 min recording + 300 min transcript + AI summary); prebuilt React components | ✅ Answered — **Phase 0 spike required** |
+| Q3 | Lecture source & grounding | **L2 — Provider post-call transcript** (100ms) | ✅ Answered |
+| Q4 | Recording/consent/retention | **Opt-in recording per session (teacher-initiated)** with FERPA/COPPA consent captured before recording | ✅ Answered — legal/compliance review recommended before implementation |
+| Q5 | Session domain model & migration | **New video-session domain** (`video_sessions`, `call_records`, `lecture_artifacts`, `transcript_chunks`, `guidance_sessions`, `guidance_messages`) | ✅ Answered |
+| Q6 | Guidance unlock/boundaries/visibility | **Unlock after `call_status=ended` + `context_ready=true`**; student-only guidance chat; constrained "guidance not tutor" persona | ✅ Answered |
+| Q7 | Disposition of current AI tutor chat | **Deprecate & archive** `/api/ai/chat`, `TutorChat`, teacher live monitor, interventions | ✅ Answered |
+| Q8 | MVP slice definition | **Minimal: 1:1 ad-hoc call → L2 transcript → post-call guidance chat (student) → teacher call log + guidance view** | ✅ Answered |
+
+**Capacitor WebView WebRTC/media permissions need a Phase 0 spike** (validate 100ms SDK on Android/iOS WebView: camera/mic permissions, signaling, join/leave, background/foreground, network changes).
 
 ---
 
-## **4. Implementation Phases**
+## **4. Implementation Phases** (pivot roadmap — **Proposed/Pending Approval**)
 
-### **Phase 1: Foundation (Week 1)** ✅ **COMPLETE**
-| Area | Deliverables | Status |
-|------|--------------|--------|
-| **Database** | Complete Drizzle schema: all tables, RLS policies, indexes, pgvector, enums, relations. Migration scripts via `drizzle-kit generate`. | ✅ Done |
-| **Neon Config** | `neon.ts` with `auth`, `realtime`, `functions`, `buckets`. Branch-per-teacher config with TTL. | ✅ Done |
-| **Auth** | Neon Auth setup: teacher email/OAuth, student LTI SSO flow. Trusted domains for preview/production. | ✅ Done |
-| **PWA Scaffold** | Next.js + `next-pwa`, manifest, icons, VAPID keys, service worker (caching, background sync), install prompt, offline fallback. | ✅ Done |
-| **Design System** | Tailwind + shadcn/ui primitives: tokens, layout, auth forms, error boundaries. | ✅ Done |
-| **CI/CD** | GitHub Actions: `neon checkout --create --env` + Vercel preview deployment. Branch env vars via Neon CLI. | ✅ Done |
+> **Note:** Phases 1-7 below delivered the **AI-tutor-chat product** (pre-pivot baseline). The pivot roadmap (Phase 0–6) has **not started** and requires approved decisions + Phase 0 spike before implementation.
 
-### **Phase 2: LTI Launch & Roster Sync (Week 1-2)** ✅ **COMPLETE**
-| Area | Deliverables | Status |
-|------|--------------|--------|
-| **LTI 1.3 Core** | OIDC launch flow (LMS → Neon Auth session → Dashboard). Deep Linking (add tutor to assignment). | ✅ Done |
-| **NRPS (Roster Sync)** | Nightly Neon Function cron: sync Canvas/Classroom/Schoology rosters → `students` table. | ✅ Done |
-| **AGS (Grade Passback)** | Line item creation, score passback from tutor assessments. | ✅ Done |
-| **Teacher Dashboard v1** | Class roster view, tutor config panel (persona, guardrails, allowed tools, subject scope). | ✅ Done |
-| **Database** | LTI tables: `lti_platforms`, `lti_deployments`, `lti_nrps_cache`, sync cursors. | ✅ Done |
+### **Pre-Pivot Baseline (Historical — Phases 1-7 Complete)**
 
-### **Phase 3: Core Tutor Agent (Week 2)** ✅ **COMPLETE**
-| Area | Deliverables | Status |
-|------|--------------|--------|
-| **Neon Function: `/chat`** | Streaming SSE, JWT auth, conversation persistence, model fallback chain (Sonnet → GPT-4o-mini → Gemini). | ✅ Done |
-| **Tools** | `searchKnowledgeBase` (pgvector RAG), `getAssignmentContext` (LMS assignment, rubric, due date). | ✅ Done |
-| **Student Chat UI** | `useChat` → direct Function URL, token minting, streaming render, offline queue (IndexedDB), push subscription. | ✅ Done |
-| **Teacher Dashboard v2** | Session list, live monitor via `useLiveQuery` (sealed Realtime queries), intervention controls (message/pause/redirect/end). | ✅ Done |
-| **Database** | Optimized queries for streaming append, conversation branching, token usage tracking. | ✅ Done |
+| Phase | Scope | Status |
+|-------|-------|--------|
+| 1 | Foundation: DB schema, Neon config, Auth, PWA scaffold, Design System, CI/CD | ✅ Done |
+| 2 | LTI 1.3 Launch, NRPS Roster Sync, AGS Grade Passback, Teacher Dashboard v1 | ✅ Done |
+| 3 | Core Tutor Agent: `/api/ai/chat` streaming, RAG, Assignment Context, Student Chat UI, Teacher Live Monitor | ✅ Done |
+| 4 | Interventions, Analytics, Grade Passback, Push Notifications, Export Tools | ✅ Done |
+| 5 | Google/Microsoft 365 OAuth, Export/Import Tools | ✅ Done (Microsoft blocked) |
+| 6 | Compliance: Content Filter, Audit Logging, Retention, Parent Portal, PWA Polish, Load Test | ✅ Done |
+| 7 | UI/UX Hardening & Data Correctness: Realtime mirrors (0013), teacher surfaces rebuild, query fixes, test coverage | ✅ Done |
 
-### **Phase 4: Interventions, Analytics & Push (Week 2-3)** ✅ **COMPLETE**
-| Area | Deliverables | Status |
-|------|--------------|--------|
-| **Intervention Tools** | Teacher sends message, pauses, redirects, ends session — persisted + realtime. | ✅ Done |
-| **Analytics** | Session duration, topics covered, struggle areas, token usage. Materialized views refreshed via cron. | ✅ Done |
-| **Grade Passback** | Tutor assessments → LMS gradebook (Canvas/Classroom AGS). | ✅ Done |
-| **Push Notifications** | Web Push triggers: new assignment, teacher message, session reminder, streak alerts. | ✅ Done |
-| **Export Tools (Teacher)** | `exportToGoogleDoc`, `exportToGoogleForm`, `exportToSlides` as tutor-callable tools. | ✅ Done |
+---
 
-### **Phase 5: Google/Microsoft 365 Integration (Week 3)** ✅ **COMPLETE**
-| Area | Deliverables | Status |
-|------|--------------|--------|
-| **OAuth Flows** | Teacher: export to Drive/Docs/Forms/Slides. Student: import from Drive. Separate token storage. | ✅ Done |
-| **Export Tools** | "Create worksheet" → Google Doc, "Create quiz" → Google Form, "Create slides" → Slides. | ✅ Done |
-| **Import Tools** | "Use this reading passage" → import from Google Doc/Drive. | ✅ Done |
-| **Microsoft Parity** | OneDrive/Word/PowerPoint equivalents via Microsoft Graph. | ⚠️ Blocked by Azure anti-fraud |
-| **Database** | `generated_artifacts`, `export_jobs`, `oauth_tokens` (encrypted), file mappings. | ✅ Done |
+### **Pivot Roadmap (Proposed — Not Started)**
 
-### **Phase 6: Compliance, Safety & Polish (Week 3-4)** ✅ **COMPLETE**
-| Area | Deliverables | Status |
-|------|--------------|--------|
-| **Content Filter** | Pre-message filter via `gpt-4o-mini`: PII, inappropriate, cheating, FERPA/COPPA concerns. | ✅ Done |
-| **Audit Logging** | All actions → `audit_logs` table (user, action, resource, metadata, IP, UA). | ✅ Done |
-| **Retention Policies** | Automated cleanup cron: FERPA (1yr chats, 7yr audit), COPPA (delete on request). | ✅ Done |
-| **Parent Portal** | Read-only session viewer, progress summary, COPPA consent management. | ✅ Done |
-| **PWA Polish** | Install prompts, splash screens, offline cached lessons, "You're offline" banner, queued messages indicator. | ✅ Done |
-| **Load Test** | `hey -n 100 -c 10` → verify 15-min budget, concurrent isolation. | ✅ Done |
+#### **Phase 0: Prerequisites & Decisions** (before any implementation)
+| Area | Deliverables |
+|------|--------------|
+| **Decisions** | ✅ **Q1–Q8 answered** (see §10); record in decision log; stakeholder sign-off |
+| **Capacitor WebRTC Spike** | Test **100ms SDK** in Capacitor WebView (Android/iOS): camera/mic permissions, signaling, join/leave, background/foreground, network changes; document limitations |
+| **Plan Updates** | Update this plan with approved decisions; detail Phase 1–6 scope; update §5 schema proposal, §6 UI proposal, §7 gates, §8 blockers |
+| **No schema/code changes** | This phase is decision-making and validation only |
+
+#### **Phase 1: Domain Model & Lifecycle Foundation**
+| Area | Deliverables |
+|------|--------------|
+| **Video session domain** | New tables: `video_sessions`, `call_records`, `lecture_artifacts`, `transcript_chunks`, `guidance_sessions`, `guidance_messages` (pgvector for chunks) |
+| **Consent/access/retention** | `recording_consent` linkage, retention policies per artifact type, RLS policies for video/guidance data |
+| **Migration/compat strategy** | Explicit plan for existing `tutor_sessions` (NOT NULL `tutor_config_id`), `messages`, `interventions`, realtime mirrors, RLS; authoritative `ended_at`/`total_duration_seconds` semantics; session_type enum or new tables |
+| **DB changes only via** | `npm run db:generate` + `npm run db:migrate` (never push) |
+
+#### **Phase 2: Video Call Integration (MVP)**
+| Area | Deliverables |
+|------|--------------|
+| **Provider integration** | Room creation, token minting (teacher + student), join/leave UI, call lifecycle persistence (`call_records`), webhook handlers (idempotent) for `session.started/ended/participant.joined/left` |
+| **Teacher launcher** | Class-scoped "Start Video Call" → creates `video_session` + provider room → student join link via LMS/direct |
+| **Student join flow** | LTI/direct auth → provider SDK join → in-call UI (mute, camera, leave) |
+| **Call end** | Teacher or student ends → `call_record.ended_at`, `duration_seconds`, `status=ended`; trigger context-ready pipeline |
+
+#### **Phase 3: Lecture Context Capture**
+| Area | Deliverables |
+|------|--------------|
+| **L2 — Provider transcript (primary, per Q3)** | Post-call webhook → ingest 100ms transcript → chunk + embed → `transcript_chunks` (pgvector); pending/failed states, retry with backoff; dead-letter visibility |
+| **L1 — Teacher notes/materials (fallback, per Q3)** | Teacher upload (PDF, images, text) → Neon Object Storage → chunk + embed → `lecture_artifacts` + `transcript_chunks`; fallback when transcript unavailable/delayed |
+| **L3 (upload+transcribe)** | Optional: Whisper in Neon Function for uploaded recordings → transcript → chunks/embeddings (defer unless needed) |
+| **Context-ready signal** | `video_session.context_ready = true` when transcript chunks available (L2) or teacher materials ingested (L1 fallback) |
+
+#### **Phase 4: Post-Call AI Guidance**
+| Area | Deliverables |
+|------|--------------|
+| **Guidance endpoint** | `/api/ai/guidance` — `useChat` streaming, OpenRouter free models, grounded retrieval over `transcript_chunks` (RAG), **constrained "guidance not tutor" persona**: Socratic/hints only, refuses direct answers, cites lecture sources (chunk IDs) |
+| **Unlock logic (per Q6)** | Student sees guidance UI **only after `call_status=ended` AND `context_ready=true`**; **student-only guidance chat** (teacher not visible) |
+| **Persistence** | `guidance_sessions` (linked to `video_session`), `guidance_messages` (with retrieval citations), token usage, audit |
+| **Filtering/audit** | Pre-message filter (PII, inappropriate, cheating); all guidance → `audit_logs` |
+| **Student UI** | Guidance chat view, artifact viewer (transcript, notes), offline queue, push for "guidance available" |
+| **Teacher UI** | Call log + duration; **no access to student guidance interactions** (per Q6) |
+
+#### **Phase 5: Realtime/Monitoring/Analytics Adaptation & Legacy Deprecation**
+| Area | Deliverables |
+|------|--------------|
+| **Realtime adaptation** | Mirror tables for `video_sessions`/`call_records`/`guidance_sessions` if needed; teacher live call monitor (participant list, duration) |
+| **Analytics** | Call duration, engagement, guidance sessions per student, topic coverage from lecture context |
+| **Legacy deprecation (per Q7)** | **Remove** `/api/ai/chat`, `TutorChat`, teacher live AI-chat monitor (`live-sessions-panel`), interventions; **archive** `tutor_sessions`, `messages`, `session_summaries`, `interventions` (keep for audit/history, no new writes) |
+
+#### **Phase 6: Compliance Hardening, Capacitor/PWA Verification, Rollout**
+| Area | Deliverables |
+|------|--------------|
+| **Compliance** | Consent flows for recording/transcript (Q4); retention/deletion automation; access audits; no-training enforcement |
+| **Capacitor/PWA** | Video call + guidance offline/background behavior; install prompts; manual device matrix (iOS Safari, Android Chrome, Chromebook) |
+| **Rollout** | Pilot with 1 teacher + 1 class; gather feedback; iterate |
+| **Plan updates** | Close decisions; document final architecture |
 
 ---
 
 ## **5. Database Development (Explicit)**
 
-### **Schema Files**
+### **Current Schema (Pre-Pivot Baseline — As Deployed)**
+
+**Schema Files** (`db/schema/`)
 ```
 db/
 ├── schema/
 │   ├── tenants.ts        # districts, schools
-│   ├── users.ts          # teachers, students, parents
-│   ├── classes.ts        # classes, tutor_config (JSONB)
-│   ├── sessions.ts       # tutor_sessions, messages
-│   ├── interventions.ts  # interventions
-│   ├── lti.ts            # platforms, deployments, nrps_cache, ags_line_items
+│   ├── users.ts          # users, teachers, students, parents, student_parents
+│   ├── classes.ts        # classes, class_students, tutor_configs
+│   ├── sessions.ts       # tutor_sessions, messages, session_summaries
+│   ├── interventions.ts  # interventions, intervention_actions
+│   ├── lti.ts            # lti_platforms, lti_deployments, nrps_cache, ags_line_items, ags_scores
 │   ├── artifacts.ts      # generated_artifacts, export_jobs, oauth_tokens
-│   ├── audit.ts          # audit_logs
-│   └── compliance.ts     # consent_records, data_deletion_requests, retention_policies
-├── migrations/           # drizzle-kit generated SQL (committed)
+│   ├── audit.ts          # audit_logs, audit_logs_partitioned
+│   ├── compliance.ts     # consent_records, data_deletion_requests, retention_policies, retention_jobs
+│   ├── push.ts           # push_subscriptions
+│   ├── vector.ts         # message_embeddings, artifact_embeddings, knowledge_embeddings,
+│   │                     #   student_learning_embeddings, embedding_jobs
+│   └── index.ts          # barrel export + Drizzle relations
 ├── rls.ts                # Row-level security policies
 ├── indexes.ts            # Performance indexes (tenant, session, time)
-└── vector.ts             # pgvector setup: embeddings, HNSW indexes
+└── vector.ts             # pgvector setup: extension, HNSW indexes
 ```
 
-### **Key Tables**
+**Migrations** (`drizzle/migrations/`)
+`0000`-`0012` generated by drizzle-kit; `0001_pgvector_extension.sql`, `0003_rls_policies.sql`, `0005_realtime_publication.sql`, `0007_vector_embeddings.sql`, `0013_realtime_shadow_tables.sql` hand-written. All registered in `meta/_journal.json`. Latest: `0013_realtime_shadow_tables`.
+
+- Apply with `npm run db:generate` then `npm run db:migrate`. **Never `drizzle push`.**
+- Migration `0013` creates realtime mirror tables (`teacher_active_sessions_realtime`, `session_messages_realtime`) and sync triggers (Neon Realtime cannot subscribe to RLS-protected relations).
+
+**Key Tables (Current)**
 | Table | Purpose | RLS Policy |
 |-------|---------|------------|
 | `districts` | Top-level tenant | Admin only |
 | `schools` | District children | District admin |
-| `teachers` | Neon Auth user + LMS IDs | Teacher sees own |
-| `classes` | Teacher's classes + tutor config | Teacher owns |
-| `students` | Class members + LMS IDs + consent | Teacher sees class; student sees self |
-| `tutor_sessions` | Active/ended tutoring sessions | Teacher sees class; student owns |
+| `users` | Neon Auth identity (role: teacher/student/parent/admin) | Self + admin |
+| `teachers` | Teacher profile; `user_id` bridge from auth | Teacher sees own |
+| `classes` | Teacher's classes (`teacher_id` → **`teachers.id`**) | Teacher owns |
+| `class_students` | Enrollment join | Teacher sees class; student sees self |
+| `students` | Student profile + LMS IDs | Teacher sees class; student sees self |
+| `tutor_sessions` | Active/ended AI tutoring sessions | Teacher sees class; student owns |
 | `messages` | Chat messages + tool calls/results | Same as session |
+| `session_summaries` | Topics, struggles, engagement per session | Same as session |
 | `interventions` | Teacher actions in student sessions | Teacher owns; student sees |
 | `audit_logs` | All actions for compliance | Admin only |
 | `lti_platforms` | Canvas/Classroom/Schoology config | District admin |
-| `lti_nrps_cache` | Roster sync cache | Sync function only |
+| `nrps_cache` | Roster sync cache | Sync function only |
 | `generated_artifacts` | Worksheets, quizzes, slides | Teacher owns; student views assigned |
 | `oauth_tokens` | Encrypted Google/Microsoft tokens | User owns |
 | `consent_records` | COPPA parent consent | Parent + admin |
+| `push_subscriptions` | Web Push endpoints | User owns |
+
+**Scoping rule:** `classes.teacher_id` references `teachers.id`, not `users.id`. Every teacher-scoped query must join `teachers` on `classes.teacher_id` and filter `teachers.user_id = auth user id`.
+
+---
+
+### **Proposed Schema Additions (Pivot — Q3, Q5 Answered)**
+
+> **Not yet implemented.** Decisions: **Q3 = L2 provider transcript (100ms) primary, L1 teacher notes fallback**; **Q5 = New video-session domain** (recommended). Tables below reflect these choices.
+
+| Proposed Table | Purpose | Notes |
+|----------------|---------|-------|
+| `video_sessions` | Parent record: class-scoped, teacher-initiated, `status` (active/ended), `context_ready` boolean, `started_at`, `ended_at`, `total_duration_seconds` | Links to `classes`, `teachers`; replaces `tutor_sessions` for video; no `scheduled` status in MVP (ad-hoc only, per Q1) |
+| `call_records` | Provider-specific call metadata: `provider` ('100ms'), `room_id`, `room_url`, `token_teacher`, `token_student`, `started_at`, `ended_at`, `duration_seconds`, `status`, `recording_url` | One per `video_session` (MVP); webhook updates from 100ms |
+| `lecture_artifacts` | Teacher-uploaded fallback materials: `video_session_id`, `type` (notes/pdf/image/slides), `storage_key`, `mime_type`, `size_bytes`, `chunk_count`, `embedding_model`, `status` (pending/ready/failed), `created_at` | Neon Object Storage key; pgvector chunks in `transcript_chunks`; L1 fallback when transcript unavailable |
+| `transcript_chunks` | Text chunks + embeddings for RAG: `video_session_id`, `source` ('100ms_transcript' | 'teacher_notes'), `chunk_index`, `content`, `embedding` (vector), `token_count` | pgvector HNSW index; partitioned by `video_session_id`; primary source is 100ms post-call transcript |
+| `guidance_sessions` | Post-call guidance chat: `video_session_id`, `student_id`, `status` (active/ended), `started_at`, `ended_at`, `message_count`, `total_tokens` | Unlocked only when `video_session.context_ready=true` AND `call_record.status=ended` |
+| `guidance_messages` | Guidance chat messages: `guidance_session_id`, `role` (user/assistant), `content`, `retrieval_citations` (chunk IDs), `token_usage`, `created_at` | Grounded in lecture context; mirrors `messages` shape but for guidance |
+| `recording_consent` | Per-student per-session consent: `video_session_id`, `student_id`, `parent_consent` (boolean), `consented_at`, `withdrawn_at` | FERPA/COPPA; gates recording/transcript storage (opt-in per session, teacher-initiated, per Q4) |
+
+**RLS/Realtime Implications (Proposed)**
+- New tables need RLS policies mirroring class-scoped access (teacher sees class, student sees own).
+- If realtime monitoring needed for video calls, new mirror tables + triggers required (like `0013`).
+- `transcript_chunks` pgvector index must be compatible with Neon Realtime constraints (no RLS on subscribed relations).
+
+**Migration Strategy (Q5 Answered: New Video-Session Domain)**
+- **Approach:** New video-session domain tables (above); `tutor_sessions`/`messages`/`session_summaries`/`interventions` **archived** (kept for historical AI-chat data, no new writes after deprecation).
+- Legacy data remains accessible for compliance/audit; new video flows use new tables exclusively.
+- Any schema change requires `npm run db:generate` + `npm run db:migrate` (never push).
 
 ---
 
 ## **6. Web UI Development (Explicit)**
 
-### **Component Structure**
+### **Current Structure (Pre-Pivot Baseline — AI-Tutor-Chat)**
+
+**Component Structure** (`src/components/`)
 ```
 components/
-├── auth/
-│   ├── LTILaunch.tsx           # LTI 1.3 entry point
-│   ├── SignIn.tsx              # Neon Auth email/OAuth
-│   └── RoleSwitch.tsx          # Teacher ↔ Admin
+├── ui/                     # shadcn-style primitives
+├── shared/                 # layout, nav, install-prompt, error-boundary
 ├── teacher/
-│   ├── ClassRoster.tsx         # Synced from LMS, editable
-│   ├── TutorConfig.tsx         # Persona, guardrails, tools, subject
-│   ├── SessionMonitor.tsx      # Realtime live view (useLiveQuery)
-│   ├── InterventionPanel.tsx   # Message/pause/redirect/end
-│   ├── AnalyticsDashboard.tsx  # Charts: duration, topics, tokens
-│   ├── ExportTools.tsx         # Google/Microsoft export builders
-│   └── GradePassback.tsx       # AGS status, manual override
+│   ├── AnalyticsDashboard.tsx        # /teacher/analytics
+│   ├── live-sessions-panel.tsx       # Dashboard realtime AI-chat monitor
+│   ├── session-analytics-charts.tsx
+│   ├── SessionSummaryCard.tsx
+│   ├── analytics/                    # Analytics building blocks
+│   ├── classes/                      # Class cards, toolbar, create dialog
+│   └── sessions/                     # Sessions list/table/cards, transcript, toolbar
 ├── student/
-│   ├── ChatInterface.tsx       # useChat + streaming + markdown
-│   ├── OfflineBanner.tsx       # "You're offline" + queue count
-│   ├── MessageQueue.tsx        # IndexedDB outbox visualizer
-│   ├── ArtifactViewer.tsx      # Render generated docs/quizzes
-│   ├── PushSubscription.tsx    # Opt-in for notifications
-│   └── ClassSelector.tsx       # Multi-class students
+│   └── TutorChat.tsx       # useChat + streaming AI chat + offline queue
 ├── parent/
-│   ├── ConsentForm.tsx         # COPPA consent flow
-│   ├── SessionViewer.tsx       # Read-only child sessions
-│   └── ProgressSummary.tsx     # Weekly/monthly digest
-├── shared/
-│   ├── Layout.tsx              # PWA shell, nav, install prompt
-│   ├── DesignSystem.tsx        # Tokens, primitives (shadcn/ui)
-│   ├── ErrorBoundary.tsx       # Graceful degradation
-│   └── LoadingStates.tsx       # Skeletons, stream placeholders
-└── admin/
-    ├── DistrictSetup.tsx       # LMS config, standards import
-    ├── AuditViewer.tsx         # Compliance logs
-    └── RetentionPolicy.tsx     # Cleanup schedule config
+│   ├── ConsentForm.tsx
+│   ├── SessionViewer.tsx
+│   └── ProgressSummary.tsx
+└── compliance/
 ```
 
-### **Pages / Routes**
+**Pages / Routes** (`src/app/`)
 ```
 app/
-├── (auth)/
-│   ├── sign-in/
-│   ├── lti/launch/             # LTI entry point
-│   └── oauth/callback/         # Google/Microsoft
-├── (teacher)/
-│   ├── dashboard/
-│   ├── classes/[classId]/
-│   │   ├── configure/          # TutorConfig
-│   │   ├── sessions/           # SessionMonitor + list
-│   │   ├── analytics/
-│   │   └── exports/
-│   └── settings/
-├── (student)/
-│   ├── chat/[sessionId]/       # ChatInterface
+├── sign-in/  sign-up/  onboarding/  auth/callback/
+├── unauthorized/
+├── lti/                     # LTI 1.3 launch
+├── oauth/callback/          # Google/Microsoft
+├── teacher/
+│   ├── dashboard/           # live AI-chat monitor
 │   ├── classes/
-│   ├── artifacts/
-│   └── notifications/
-├── (parent)/
-│   ├── consent/
-│   ├── children/[studentId]/
-│   └── progress/
-└── (admin)/
-    ├── districts/
-    ├── audit/
-    └── retention/
+│   │   └── [id]/            # class detail
+│   ├── sessions/
+│   │   ├── new/             # start AI tutor session
+│   │   └── [id]/            # AI chat transcript
+│   ├── analytics/
+│   └── settings/
+├── student/
+│   ├── classes/  sessions/  artifacts/  notifications/  settings/
+├── parent/                  # /parent/*
+├── admin/
+└── api/                     # route handlers (auth, ai/chat, teacher/*, student/*, lti/*, ...)
+```
+
+---
+
+### **Proposed Structure (Pivot — Video Call + Post-Call Guidance — Q1–Q8 Answered)**
+
+> **Not yet implemented.** Distinguishes new video/guidance surfaces from legacy AI-chat (to deprecate per Q7).
+
+**New / Modified Components**
+```
+components/
+├── teacher/
+│   ├── video/
+│   │   ├── VideoCallLauncher.tsx      # "Start Video Call" per class (1:1 ad-hoc)
+│   │   ├── CallMonitor.tsx            # Live participant view, duration, end call
+│   │   ├── LectureArtifactsManager.tsx # View 100ms transcript status; upload notes (L1 fallback)
+│   │   └── CallDetailView.tsx         # Call log + duration; **no guidance visibility** (per Q6)
+│   ├── sessions/                      # LEGACY — AI tutor chat sessions (to deprecate per Q7)
+│   └── analytics/                     # Extended with call duration, guidance usage
+├── student/
+│   ├── video/
+│   │   ├── VideoCallJoin.tsx          # Join call (100ms SDK)
+│   │   ├── InCallUI.tsx               # Mute, camera, leave, 100ms controls
+│   │   └── PostCallGuidance.tsx       # Guidance chat (unlocked after end+context_ready)
+│   │       ├── GuidanceChat.tsx       # useChat → /api/ai/guidance (constrained persona)
+│   │       ├── ArtifactViewer.tsx     # 100ms transcript + teacher notes
+│   │       └── GuidanceHistory.tsx    # Past guidance sessions for this student
+│   └── TutorChat.tsx                  # LEGACY — AI tutor chat (to deprecate per Q7)
+└── shared/
+    └── VideoCallProvider.tsx          # 100ms SDK context
+```
+
+**New / Modified Routes**
+```
+app/
+├── teacher/
+│   ├── classes/
+│   │   └── [id]/
+│   │       └── video/               # Video call launcher, lecture artifacts (transcript status, notes upload)
+│   ├── video-sessions/              # Video session list (replaces sessions for video)
+│   │   └── [id]/                    # Call detail: duration, recording link, transcript status; **no student guidance**
+│   └── analytics/                   # Extended: call metrics, guidance usage (aggregate)
+├── student/
+│   ├── video/
+│   │   ├── join/[sessionId]/        # Join video call
+│   │   ├── call/[sessionId]/        # In-call UI
+│   │   └── guidance/[sessionId]/    # Post-call guidance chat + artifacts (unlocked after end+context)
+│   └── sessions/                    # LEGACY — AI tutor chat history (to deprecate)
+├── api/
+│   ├── ai/
+│   │   ├── chat/                    # LEGACY — /api/ai/chat (to deprecate per Q7)
+│   │   └── guidance/                # NEW — /api/ai/guidance (post-call, grounded in transcript_chunks)
+│   ├── teacher/
+│   │   ├── video-sessions/          # CRUD, launch, end, artifacts (transcript/notes)
+│   │   └── calls/                   # Call log, duration, transcript status
+│   └── student/
+│       └── guidance/                # Student guidance endpoint
 ```
 
 ---
 
 ## **7. Validation & Quality Gates**
 
-| Gate | Command / Check | Phase |
-|------|-----------------|-------|
-| **TypeScript** | `npm run typecheck` | All |
-| **Lint** | `npm run lint` | All |
-| **Build** | `npm run build` (Next.js + Hono) | All |
-| **Drizzle Generate** | `npm run db:generate` | 1, 2, 5, 6 |
-| **Drizzle Migrate** | `npm run db:migrate` (on `DATABASE_URL_UNPOOLED`) | 1, 2, 5, 6 |
-| **Function Local** | `neon dev` → streaming + auth + tools + fallback | 3, 4 |
-| **LTI Test** | Canvas dev key → launch → roster sync | 2 |
-| **PWA Audit** | Lighthouse PWA ≥ 90, install works, offline loads | 1, 6 |
-| **Push Test** | VAPID → send → receive on ChromeOS/Android/iOS 16.4+ | 4 |
-| **Realtime Test** | Teacher dashboard → student chat → live updates | 3 |
-| **Preview Deploy** | PR → Neon branch + Vercel preview → integration test | All |
-| **Load Test** | `hey -n 100 -c 10 <function-url>` | 6 |
-| **Compliance Audit** | FERPA/COPPA flow review with legal | 6 |
+Run before every deploy. Current status as of 2026-11-19 (pre-pivot baseline).
+
+| Gate | Command / Check | Current Result |
+|------|-----------------|----------------|
+| **TypeScript** | `npm run type-check` (`tsc --noEmit`) | ✅ Clean |
+| **Lint** | `npm run lint` (`eslint .`) | ✅ 0 errors · 8 pre-existing warnings |
+| **Unit tests** | `npm test` (`vitest run`) | ✅ 152/152 passing across 9 files |
+| **Drizzle Generate** | `npm run db:generate` (after any `db/schema` change) | ✅ Up to date (`0000`-`0013`) |
+| **Drizzle Migrate** | `npm run db:migrate` (unpooled URL) | ✅ Applied, incl. `0013_realtime_shadow_tables` |
+| **Build** | `npm run build` (`next build`) | ✅ Green; `/teacher/*` routes render dynamically |
+| **E2E** | `npm run test:e2e` (Playwright) | Available; not part of default gate |
+| **API smoke (unauthenticated)** | `curl` production routes | ✅ `/teacher/*` → 307, `/api/teacher/*` → 401 |
+| **Analytics API (live DB)** | Temporary mocked-auth vitest harness against Neon | ✅ 200; dense 30-day series |
+| **Realtime Test** | `neon realtime subscribe` on both mirror tables | ✅ Streaming |
+| **PWA Audit** | Lighthouse PWA, install + offline load | Manual — pending signed-in pass |
+| **Push Test** | VAPID → send → receive | Manual — pending device pass |
+| **Load Test** | `npm run load-test` | Script available |
+
+**Signed-in visual QA outstanding** for `/teacher/classes`, `/teacher/sessions`, `/teacher/sessions/[id]`, `/teacher/analytics`; requires teacher session.
 
 ---
 
-## **8. Critical Blockers (Resolve Before Coding)**
+### **Proposed Gates for Pivot (Implementation Pending Phase 0 Spike)**
 
-| Blocker | Action | Owner |
-|---------|--------|-------|
-| **OpenRouter API Key** | Sign up at openrouter.ai → add to Neon env vars | You |
-| **LTI Developer Keys** | Register in Canvas/Classroom/Schoology dev portals | You |
-| **Google Cloud Project** | Enable Drive, Docs, Forms, Slides, Classroom APIs; OAuth consent | You |
-| **Microsoft Entra App** | Register for Microsoft Graph (Drive, OneDrive) | You |
-| **VAPID Keys** | `npx web-push generate-vapid-keys` → add to env | You |
-| **Neon Project** | Provision in `aws-us-east-2` (best Functions + Realtime) | You |
-| **Custom Domain (optional)** | Purchase + configure in Vercel | You |
+| Gate | Description |
+|------|-------------|
+| **Capacitor/WebView WebRTC Matrix** | Manual test on iOS Safari, Android Chrome, Chromebook: join/leave, background/foreground, network change, permissions, audio/video quality (**Phase 0 spike deliverable**) |
+| **Provider Webhook Idempotency (100ms)** | Simulate duplicate/misordered 100ms webhooks (`session.started/ended`, `participant.joined/left`); verify `call_record` state machine correctness |
+| **Session Lifecycle & Guidance Unlock AuthZ** | Integration tests: call end → context ready → guidance unlocked for **student only** (per Q6); blocked if context not ready |
+| **Lecture Artifact Access/Retention** | RLS tests: 100ms transcript → student views in guidance; **recording_consent** gates recording/transcript (opt-in, per Q4); retention job deletes on schedule |
+| **Realtime Model Changes** | Subscribe to new video/guidance mirror tables; verify teacher live call monitor (participant list, duration) updates |
+| **Legacy Regression** | Verify AI-chat paths (`/api/ai/chat`, `TutorChat`) still work until Q7 deprecation; no cross-contamination with guidance data |
+| **All existing gates** | type-check, lint, test, build, db:generate/migrate, PWA audit, push test, load test — **must remain passing** |
+
+---
+
+## **8. Critical Blockers**
+
+| Blocker | Action | Status |
+|---------|--------|--------|
+| **Capacitor WebRTC Spike (100ms SDK)** | Validate 100ms SDK in Capacitor WebView (Android/iOS): camera/mic permissions, signaling, join/leave, background/foreground, network changes; document limitations | 🟡 **Pivot Blocker — Phase 0** |
+| **Recording/consent/retention policy (Q4)** | FERPA/COPPA legal review: consent flow (opt-in per session, teacher-initiated), retention schedule, auto-deletion, no-training enforcement | 🟡 **Pivot Blocker — Phase 0** |
+| **Microsoft Entra App** | Register for Microsoft Graph (Drive, OneDrive) | ⛔ Blocked — Azure anti-fraud review |
+| **Custom Domain (optional)** | Not configured; using Vercel production alias | ⏸ Deferred |
+| **Google → existing email/password linking** | Neon Auth exposes no social-link endpoint | ⛔ Blocked — upstream limitation |
 
 ---
 
@@ -306,51 +467,107 @@ app/
 
 | Service | Cost | Notes |
 |---------|------|-------|
-| **OpenRouter (LLM)** | **$10-50** | Pilot: 500 sessions/mo mixed models; free tier for dev |
-| **Neon** | **$0** | Free tier: 0.5 GB, autoscaling, 10 branches, Functions, Realtime, Storage, Auth |
-| **Vercel** | **$0** | Free tier: 100 GB bandwidth, unlimited personal projects |
+| **OpenRouter (LLM)** | **$0** | Free models only (`openrouter/free` + `:free`) |
+| **Neon** | **$0** | Free tier: Lakebase Postgres, autoscaling, branches, Realtime, Storage, Auth |
+| **Vercel** | **$0** | Free tier: personal project, production alias |
+| **Video Provider** | **$0 (target)** | Must fit chosen provider free tier (concurrent rooms, minutes, TURN, recording, transcripts) — **pending Q2** |
+| **Transcription/Storage** | **$0 (target)** | Must fit Neon Object Storage free tier + provider transcript inclusion or Whisper in Neon Function — **pending Q3** |
 | **LMS APIs** | **$0** | Free developer keys |
-| **Google/Microsoft APIs** | **$0** | Free tiers sufficient |
-| **Domain (optional)** | **~$12/yr** | Custom domain |
-| **Total (pilot)** | **~$10-50/mo** | **Only OpenRouter is variable cost** |
+| **Google APIs** | **$0** | Free tiers sufficient |
+| **Domain (optional)** | **~$12/yr** | Not configured |
+| **Total (pilot)** | **$0/mo (target)** | Free tiers only; video/transcription/storage usage must fit provider/Object Storage free-tier limits |
 
 ---
 
-## **10. Open Questions (Need Your Input)**
+## **10. Decisions & Open Questions**
 
-1. **Standards alignment**: Include CCSS/NGSS/state standards in knowledge base for RAG?
-2. **Tutor persona config**: What parameters should teachers control? (tone, scaffolding level, allowed topics, refusal style, language)
-3. **Student auth**: LTI-only, or also direct email/password for non-LMS schools?
-4. **Pilot scope**: Start with 1 LMS (Canvas?) + 1 teacher + 1 class?
-5. **Push notification triggers**: Which events? (new assignment, teacher message, session reminder, streak alerts, parent digest)
-6. **Language support**: English only initially, or Spanish/other from start?
-7. **Analytics depth**: Basic (duration, topics) or advanced (misconception detection, learning progression)?
+### **Resolved (Carry Forward)**
+1. **Language** — English only.
+2. **Models** — OpenRouter free models only, with ordered fallbacks; non-free ids rejected at runtime.
+3. **Student auth** — Neon Auth for all roles plus LTI 1.3 launch; direct email/password for non-LMS schools.
+4. **Realtime** — Neon Realtime over RLS-free mirror tables, with polling fallback.
+5. **Migrations** — `drizzle-kit generate` + `migrate`; no `push`.
+6. **PWA Approach** — Capacitor 8 live-server (not static export); hand-written service worker.
+7. **Stack** — Next.js App Router on Vercel, Neon (Lakebase Postgres, Auth, Realtime, Object Storage, Functions), Drizzle ORM/kit.
+8. **Compliance Baseline** — FERPA/COPPA audit logs, retention automation, parent consent, no training on student data.
+
+### **Answered (Pivot Decisions Q1–Q8 — Awaiting Phase 0 Spike Validation)**
+
+| # | Decision | Choice | Notes |
+|---|----------|--------|-------|
+| Q1 | **Session scope**: 1:1 vs group; ad-hoc vs scheduled | **1:1 ad-hoc only (MVP)** | Group/scheduled defer |
+| Q2 | **Video provider** (managed SDK) | **100ms** | Bundled free tier: 10k call min + 300 min recording + 300 min post-call transcript + AI summary; prebuilt React components. **Phase 0 spike required for Capacitor WebView validation.** |
+| Q3 | **Lecture source & grounding** | **L2 — Provider post-call transcript (100ms) primary; L1 — Teacher notes/materials fallback** | L3 (Whisper) optional; L4 (live) defer |
+| Q4 | **Recording/consent/retention** | **Opt-in recording per session (teacher-initiated)** with FERPA/COPPA consent captured before recording | Legal/compliance review recommended before implementation |
+| Q5 | **Session model & migration** | **New video-session domain** (`video_sessions`, `call_records`, `lecture_artifacts`, `transcript_chunks`, `guidance_sessions`, `guidance_messages`, `recording_consent`) | Archive legacy `tutor_sessions`/`messages`/`session_summaries`/`interventions` |
+| Q6 | **Guidance unlock/boundaries/visibility** | **Unlock after `call_status=ended` + `context_ready=true`**; **student-only guidance chat**; constrained "guidance not tutor" persona (Socratic/hints, no answers, cites lecture sources) | Teacher cannot see student guidance interactions |
+| Q7 | **Disposition of current AI tutor chat** | **Deprecate & archive** `/api/ai/chat`, `TutorChat`, teacher live monitor, interventions | Clean break; legacy data kept for audit/history |
+| Q8 | **MVP slice** | **Minimal: 1:1 ad-hoc call → L2 transcript → post-call guidance chat (student) → teacher call log + guidance view** | No scheduling, no group, no rich in-call tools; free-tier only |
+
+**Detail Questions (for Phase 1 design):**
+- Join flow: teacher creates room → student joins via deep link/LMS; ownership = teacher's class
+- Webhook failure states: idempotency keys, retry with backoff, dead-letter visibility
+- Guidance session ownership: student owns; teacher reads call log only (no guidance); admin reads all
+- Capacitor permissions: `camera`, `microphone` in `capacitor.config.ts` + native manifests (Phase 0 spike)
+
+### **Still-Relevant Prior Open Questions**
+1. **Standards alignment** — include CCSS/NGSS/state standards in RAG knowledge base?
+2. **Tutor persona config** — which parameters should teachers control (tone, scaffolding, allowed topics, refusal style)?
+3. **Pilot scope** — begin with one LMS (Canvas) + one teacher + one class?
+4. **Push triggers** — which events (assignment, teacher message, reminder, streak, parent digest)?
+5. **Analytics depth** — basic (duration, topics, engagement) vs. advanced (misconception detection, progression)?
+6. **Microsoft Graph** — external unblock required before 365 parity.
 
 ---
 
-## **11. Next Deliverables (All Phases Complete)**
+## **11. Deliverables & Known Issues / Next Steps**
 
+### **Delivered (Pre-Pivot Baseline — Phases 1-7)**
 | Deliverable | Includes | Status |
 |-------------|----------|--------|
-| **1. Drizzle Schema + Migration** | All tables, RLS, indexes, pgvector, enums, relations, `db:generate` script | ✅ Done |
-| **2. Neon `neon.ts` + CI/CD** | All services declared, branch-per-teacher config, GitHub Actions workflow | ✅ Done |
-| **3. Next.js + PWA Scaffold** | `next.config.js`, manifest, service worker, VAPID, layout, design system, auth pages | ✅ Done |
-| **4. Teacher Dashboard v1** | Class roster, tutor config panel, LTI launch integration | ✅ Done |
-| **5. Neon Function: Core Tutor** | Auth, streaming, OpenRouter, tool loop, fallback, persistence, Realtime subscribe | ✅ Done |
-| **6. Student Chat UI** | `useChat` + streaming, offline queue, push subscription, artifact viewer | ✅ Done |
+| **1. Drizzle Schema + Migrations** | All tables, RLS, indexes, pgvector, relations, `db:generate`/`db:migrate` | ✅ Done |
+| **2. Neon Platform Config + CI/CD** | Auth, Realtime, Object Storage, branches, Vercel production deploys | ✅ Done |
+| **3. Next.js + PWA Shell** | App Router, hand-written service worker, manifest, install prompt, offline banner, Capacitor 8 shell | ✅ Done |
+| **4. Teacher Surfaces (AI-Chat)** | Dashboard, classes list/detail, AI-chat sessions list/transcript, analytics | ✅ Done |
+| **5. Tutor Agent (AI-Chat)** | Streaming chat, free-model fallback, RAG, persistence | ✅ Done |
+| **6. Student Chat UI (AI-Chat)** | `useChat` streaming, offline queue, push subscription, artifacts | ✅ Done |
+| **7. Phase 7 Hardening** | Realtime mirrors (0013), scoping fixes, redesigned teacher pages, new vitest coverage (152 passing) | ✅ Done |
 
 ---
 
-### **🎉 All 6 Phases Complete — Project Ready for Pilot**
+### **Known Issues / Follow-ups (Current Baseline)**
 
-**Production URL:** https://ai-tutor-platform-exconde.vercel.app
+| Issue | Impact | Next Step |
+|-------|--------|-----------|
+| Signed-in visual QA not performed for redesigned teacher pages | Charts/tabs/mobile layout unverified visually | Manual pass with a teacher account |
+| All 14 seeded sessions remain `status='active'`, `ended_at` NULL, `total_duration_seconds` 0 | Duration KPIs and session-length chart show honest empty states | Wire session completion / duration accounting |
+| No `session_summaries` or `interventions` rows in live data | Content and Interventions tabs show empty states | Generate summaries; exercise intervention flows |
+| `token_usage` is `{}` and messages lack `metadata.tokens` | Token card shows "not recorded yet" | Capture usage from model responses |
+| Microsoft Graph end-to-end | 365 parity unavailable | Needs Azure App Registration unblock |
+| Google → existing email/password account linking | Users with both cannot merge | Blocked on Neon Auth social-link support |
+| Feature work uncommitted in working tree | Production reflects deployed builds, not git history | Commit and push |
 
-**Remaining Open Items (from §10):**
-- Microsoft Graph integration blocked by Azure anti-fraud review
-- Account linking (Google to existing email/password) — Neon Auth limitation
-- Pilot scope, standards alignment, tutor persona config — need stakeholder input
+---
 
-**Next Steps:**
-1. Run pilot with 1 teacher + 1 class (Canvas LTI)
-2. Resolve Microsoft Graph access
-3. Gather feedback on tutor persona parameters
+### **Pending Pivot Deliverables (Tied to Phase 0+)**
+| Deliverable | Depends On |
+|-------------|------------|
+| Decision record (Q1–Q8 — answered) | Stakeholder sign-off, Phase 0 spike results |
+| Capacitor WebRTC spike report (100ms SDK) | Phase 0 spike execution |
+| Detailed schema/migration for video-session domain | Phase 1 (after spike approval) |
+| Video call integration (MVP) | Phase 2 |
+| Post-call guidance endpoint + UI | Phase 3–4 |
+| Compliance hardening for recordings/transcripts | Q4 legal review + Phase 6 |
+| Deprecation of AI-chat paths | Phase 5 |
+
+---
+
+### **Next Steps**
+1. **Run Phase 0 spike**: Capacitor WebRTC test with **100ms SDK**; document results (join/leave, permissions, background/foreground, network changes on Android/iOS WebView).
+2. **Record decisions** in decision log; obtain stakeholder sign-off (including legal/compliance for Q4).
+3. **Draft detailed schema/migration** for video-session domain (Phase 1 scope) — only after spike passes and decisions approved.
+4. **No implementation until decisions approved** and Phase 0 spike complete.
+
+---
+
+**End of Master Project Plan** — This document reflects the **pre-pivot deployed baseline** (Phases 1-7 complete) and a **proposed pivot roadmap** (Phases 0-6) that requires **Phase 0 spike validation** (100ms + Capacitor WebRTC) and **stakeholder sign-off** before any implementation begins.

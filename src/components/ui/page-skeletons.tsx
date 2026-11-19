@@ -50,7 +50,7 @@ export function TeacherDashboardSkeleton() {
  */
 export function TeacherSessionsSkeleton() {
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 max-w-7xl mx-auto">
       {/* Page Header - h1 + p + button */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
@@ -60,13 +60,36 @@ export function TeacherSessionsSkeleton() {
         <Skeleton className="h-10 w-32 shrink-0" variant="rectangular" />
       </div>
 
-      {/* Sessions Table Card */}
-      <CardSkeleton 
-        showHeader 
-        showContent 
-        contentLines={1}
-        className="h-full"
-      />
+      {/* Summary Strip - 3 stat cards */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <CardSkeleton showHeader={false} showContent contentLines={2} className="p-4 h-full" />
+        <CardSkeleton showHeader={false} showContent contentLines={2} className="p-4 h-full" />
+        <CardSkeleton showHeader={false} showContent contentLines={2} className="p-4 h-full" />
+      </div>
+
+      {/* Toolbar */}
+      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+        <Skeleton className="h-10 flex-1 min-w-0" variant="rectangular" /> {/* Search */}
+        <Skeleton className="h-10 w-full sm:w-auto min-w-[160px]" variant="rectangular" /> {/* Status Select */}
+        <Skeleton className="h-10 w-full sm:w-auto min-w-[180px]" variant="rectangular" /> {/* Class Select */}
+        <div className="flex items-center gap-3 w-full sm:w-auto justify-between">
+          <Skeleton className="h-4 w-24" variant="text" /> {/* Result count */}
+          <Skeleton className="h-8 w-24 shrink-0" variant="rectangular" /> {/* Clear filters button */}
+        </div>
+      </div>
+
+      {/* Sessions Table - 6 rows */}
+      <div className="space-y-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="p-3 rounded-lg border">
+            <div className="flex items-center justify-between">
+              <Skeleton className="h-5 w-1/3" variant="text" />
+              <Skeleton className="h-5 w-16" variant="rectangular" /> {/* Badge */}
+            </div>
+            <Skeleton className="h-4 w-full mt-2" variant="text" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -112,56 +135,55 @@ export function TeacherSettingsSkeleton() {
  */
 export function TeacherAnalyticsSkeleton() {
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 max-w-7xl mx-auto">
       {/* Header with controls */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <Skeleton className="h-8 w-1/3" variant="text" />
           <Skeleton className="h-4 w-1/2 mt-2" variant="text" />
         </div>
-        <div className="flex flex-wrap items-center gap-4">
-          <Skeleton className="h-10 w-36" variant="rectangular" /> {/* Select: Time range */}
-          <Skeleton className="h-10 w-40" variant="rectangular" /> {/* Select: Class */}
-          <Skeleton className="h-10 w-24" variant="rectangular" /> {/* Refresh button */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-3 w-full">
+          <div className="flex flex-wrap gap-2 w-full sm:w-auto" role="group" aria-label="Time range">
+            <Skeleton className="h-10 w-24" variant="rectangular" />
+            <Skeleton className="h-10 w-24" variant="rectangular" />
+            <Skeleton className="h-10 w-24" variant="rectangular" />
+            <Skeleton className="h-10 w-24" variant="rectangular" />
+          </div>
+          <div className="w-full sm:w-auto">
+            <Skeleton className="h-10 w-full sm:w-[220px]" variant="rectangular" />
+          </div>
+          <div className="flex items-center gap-3 w-full sm:w-auto justify-between">
+            <Skeleton className="h-10 w-24" variant="rectangular" />
+            <Skeleton className="h-4 w-32" variant="text" />
+          </div>
         </div>
       </div>
 
-      {/* Overview Stats - 4 stat cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
+      {/* Overview Stats - 4 KPI cards */}
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4" role="region" aria-label="Key metrics">
         <StatCardSkeleton />
         <StatCardSkeleton />
         <StatCardSkeleton />
         <StatCardSkeleton />
       </div>
 
-      {/* Charts Row 1 - 2 charts */}
-      <div className="grid gap-6 lg:grid-cols-2 mb-6">
-        <ChartSkeleton type="line" height={300} />
-        <ChartSkeleton type="line" height={300} />
-      </div>
+      {/* Tabs bar */}
+      <Skeleton className="h-10 w-full" variant="rectangular" />
 
-      {/* Charts Row 2 - Token usage + Weekly progress */}
-      <div className="grid gap-6 lg:grid-cols-2 mb-6">
-        <CardSkeleton 
-          showHeader 
-          showContent 
-          contentLines={3}
-        />
-        <ChartSkeleton type="bar" height={250} />
-      </div>
+      {/* Overview Tab Content - Activity Chart (full width) */}
+      <div className="space-y-6" role="tabpanel" aria-label="Overview">
+        <CardSkeleton showHeader showContent={false} className="h-[350px]" />
+        
+        {/* Row with DurationChart, WeeklyProgressList, Token Usage */}
+        <div className="grid gap-4 lg:grid-cols-3">
+          <CardSkeleton showHeader showContent={false} className="h-[300px]" />
+          <CardSkeleton showHeader showContent={false} className="h-[300px]" />
+          <CardSkeleton showHeader showContent contentLines={3} />
+        </div>
 
-      {/* Tabs Content - Topics & Struggles */}
-      <div className="grid gap-6 lg:grid-cols-2 mb-6">
-        <ChartSkeleton type="bar" height={350} />
-        <ChartSkeleton type="bar" height={350} />
+        {/* Recent Sessions */}
+        <CardSkeleton showHeader showContent contentLines={5} />
       </div>
-
-      {/* Interventions Card */}
-      <CardSkeleton 
-        showHeader 
-        showContent 
-        contentLines={3}
-      />
     </div>
   );
 }
@@ -171,17 +193,24 @@ export function TeacherAnalyticsSkeleton() {
  */
 export function StudentClassesSkeleton() {
   return (
-    <div className="space-y-6 p-6">
-      <div>
-        <Skeleton className="h-8 w-1/3 mb-2" variant="text" />
-        <Skeleton className="h-4 w-1/2" variant="text" />
+    <div className="space-y-6">
+      {/* Header with h1, subtitle, and join button placeholder */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <Skeleton className="h-8 w-1/3 mb-2" variant="text" />
+          <Skeleton className="h-4 w-1/2" variant="text" />
+        </div>
+        <Skeleton className="h-10 w-32 shrink-0" variant="rectangular" />
       </div>
 
-      {/* Class Cards Grid - 3 cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <CardSkeleton showHeader={false} showContent contentLines={4} className="p-6 h-full" />
-        <CardSkeleton showHeader={false} showContent contentLines={4} className="p-6 h-full" />
-        <CardSkeleton showHeader={false} showContent contentLines={4} className="p-6 h-full" />
+      {/* Tabs bar placeholder */}
+      <Skeleton className="h-10 w-full" variant="rectangular" />
+
+      {/* Class Cards Grid - 3 cards matching new layout */}
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <CardSkeleton showHeader={false} showContent contentLines={5} className="h-full" />
+        <CardSkeleton showHeader={false} showContent contentLines={5} className="h-full" />
+        <CardSkeleton showHeader={false} showContent contentLines={5} className="h-full" />
       </div>
     </div>
   );
@@ -349,26 +378,26 @@ export function SessionListSkeleton({ count = 3 }: { count?: number }) {
  */
 export function TeacherNewSessionSkeleton() {
   return (
-    <div className="space-y-6 p-6 max-w-2xl">
+    <div className="space-y-6 max-w-4xl mx-auto">
       {/* Header */}
-      <div className="flex items-center gap-4 mb-6">
-        <Skeleton className="h-10 w-10" variant="circular" />
-        <div>
-          <Skeleton className="h-8 w-1/3" variant="text" />
-          <Skeleton className="h-4 w-1/2 mt-2" variant="text" />
+      <div className="space-y-2">
+        <Skeleton className="h-8 w-36" variant="rectangular" />
+        <div className="space-y-2">
+          <Skeleton className="h-9 w-80 max-w-full" variant="text" />
+          <Skeleton className="h-4 w-[28rem] max-w-full" variant="text" />
         </div>
       </div>
 
-      {/* Student Card */}
-      <CardSkeleton showHeader showContent contentLines={3} />
+      {/* Class Selection Card */}
+      <CardSkeleton showHeader showContent contentLines={4} />
 
-      {/* Class Card */}
-      <CardSkeleton showHeader showContent contentLines={2} />
+      {/* Student Selection Card */}
+      <CardSkeleton showHeader showContent contentLines={4} />
 
       {/* Actions Row */}
-      <div className="flex gap-4 pt-4">
-        <Skeleton className="h-10 flex-1" variant="rectangular" />
-        <Skeleton className="h-10 w-48 flex-1" variant="rectangular" />
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
+        <Skeleton className="h-10 w-full sm:w-24" variant="rectangular" />
+        <Skeleton className="h-10 w-full sm:w-[180px]" variant="rectangular" />
       </div>
     </div>
   );
@@ -379,9 +408,9 @@ export function TeacherNewSessionSkeleton() {
  */
 export function TeacherClassesSkeleton() {
   return (
-    <div className="space-y-6 max-w-4xl mx-auto p-6">
+    <div className="space-y-6 p-4 sm:p-6 max-w-6xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
           <Skeleton className="h-8 w-1/3" variant="text" />
           <Skeleton className="h-4 w-1/2 mt-2" variant="text" />
@@ -389,11 +418,25 @@ export function TeacherClassesSkeleton() {
         <Skeleton className="h-10 w-32 shrink-0" variant="rectangular" />
       </div>
 
-      {/* Create Form Card */}
-      <CardSkeleton showHeader showContent contentLines={5} />
+      {/* Summary Strip - 3 stat cards */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <CardSkeleton showHeader={false} showContent contentLines={2} className="p-4 h-full" />
+        <CardSkeleton showHeader={false} showContent contentLines={2} className="p-4 h-full" />
+        <CardSkeleton showHeader={false} showContent contentLines={2} className="p-4 h-full" />
+      </div>
+
+      {/* Toolbar */}
+      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+        <Skeleton className="h-10 flex-1 min-w-0" variant="rectangular" /> {/* Search */}
+        <Skeleton className="h-10 w-full sm:w-auto min-w-[160px]" variant="rectangular" /> {/* Select */}
+        <div className="flex items-center gap-3 w-full sm:w-auto justify-between">
+          <Skeleton className="h-4 w-24" variant="text" /> {/* Result count */}
+          <Skeleton className="h-8 w-24 shrink-0" variant="rectangular" /> {/* Clear filters button */}
+        </div>
+      </div>
 
       {/* Classes Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <CardSkeleton showHeader={false} showContent contentLines={4} className="p-5 h-full" />
         <CardSkeleton showHeader={false} showContent contentLines={4} className="p-5 h-full" />
         <CardSkeleton showHeader={false} showContent contentLines={4} className="p-5 h-full" />

@@ -4,7 +4,7 @@ import { TeacherAnalyticsDashboard } from "@/components/teacher/AnalyticsDashboa
 
 export default function TeacherAnalyticsPage() {
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 max-w-7xl mx-auto">
       <TeacherAnalyticsDashboard />
     </div>
   );

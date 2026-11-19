@@ -75,7 +75,7 @@ interface LiveSessionsPanelProps {
 export function LiveSessionsPanel({
   teacherId,
   displayName,
-  usePolling = false, // Default to Realtime now
+  usePolling = false, // Back to Realtime
   pollingInterval = 15000,
 }: LiveSessionsPanelProps) {
   const router = useRouter();

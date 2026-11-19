@@ -1,19 +1,22 @@
 "use client";
 
 import * as React from "react";
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { TutorChat } from "@/components/student/TutorChat";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { StudentSessionsSkeleton, TutorChatSkeleton } from "@/components/ui/page-skeletons";
+import { StudentSessionsSkeleton } from "@/components/ui/page-skeletons";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export default function StudentSessionsPage() {
+function StudentSessionsContent() {
+  const searchParams = useSearchParams();
+  const classId = searchParams.get("classId") ?? undefined;
   const [loading, setLoading] = useState(true);
   const [hasSessions, setHasSessions] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setHasSessions(false); // In production, fetch from API
+      setHasSessions(false);
       setLoading(false);
     }, 800);
     return () => clearTimeout(timer);
@@ -26,12 +29,14 @@ export default function StudentSessionsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold mb-6">My Sessions</h1>
-        <p className="text-muted-foreground">Your tutoring session history</p>
+        <h1 className="text-3xl font-bold tracking-tight mb-2">My Sessions</h1>
+        <p className="text-muted-foreground">
+          {classId ? "Tutoring for your selected class" : "Your tutoring session history"}
+        </p>
       </div>
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <TutorChat />
+          <TutorChat classId={classId} />
         </div>
         <div className="space-y-4">
           <Card>
@@ -67,5 +72,13 @@ export default function StudentSessionsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function StudentSessionsPage() {
+  return (
+    <Suspense fallback={<StudentSessionsSkeleton />}>
+      <StudentSessionsContent />
+    </Suspense>
   );
 }

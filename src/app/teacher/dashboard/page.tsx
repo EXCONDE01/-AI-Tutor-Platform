@@ -2,31 +2,65 @@
 
 import * as React from "react";
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, BookOpen, MessageSquare, BarChart3, TrendingUp, Clock, CheckCircle, AlertTriangle, Zap } from "lucide-react";
+import { LiveSessionsPanel } from "@/components/teacher/live-sessions-panel";
 import { TeacherDashboardSkeleton } from "@/components/ui/page-skeletons";
+import { useSession } from "@/lib/auth/client";
+
+interface DashboardStats {
+  activeClasses: number;
+  totalStudents: number;
+  sessionsThisWeek: number;
+  avgProgress: string;
+}
 
 export default function TeacherDashboardPage() {
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState<any>(null);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const { data: session } = useSession();
 
+  // Fetch real dashboard stats
   useEffect(() => {
-    // Simulate data fetch - in production, replace with real API call
-    const timer = setTimeout(() => {
-      setStats({
-        activeClasses: 3,
-        totalStudents: 87,
-        sessionsThisWeek: 12,
-        avgProgress: "78%",
-      });
-      setLoading(false);
-    }, 800);
-    return () => clearTimeout(timer);
+    const fetchStats = async () => {
+      try {
+        const res = await fetch("/api/teacher/dashboard", { credentials: "include" });
+        if (res.ok) {
+          const data = await res.json();
+          setStats(data);
+        } else {
+          // Fallback to empty stats
+          setStats({
+            activeClasses: 0,
+            totalStudents: 0,
+            sessionsThisWeek: 0,
+            avgProgress: "0%",
+          });
+        }
+      } catch (error) {
+        console.error("Failed to fetch dashboard stats:", error);
+        setStats({
+          activeClasses: 0,
+          totalStudents: 0,
+          sessionsThisWeek: 0,
+          avgProgress: "0%",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
   }, []);
 
   if (loading) {
     return <TeacherDashboardSkeleton />;
   }
+
+  const teacherId = session?.user?.id;
+  console.log('[TeacherDashboard] session:', session);
+  console.log('[TeacherDashboard] teacherId:', teacherId);
 
   return (
     <div className="space-y-6">
@@ -44,7 +78,7 @@ export default function TeacherDashboardPage() {
             <BookOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.activeClasses}</div>
+            <div className="text-2xl font-bold">{stats?.activeClasses ?? 0}</div>
             <p className="text-xs text-muted-foreground">Total classes</p>
           </CardContent>
         </Card>
@@ -54,7 +88,7 @@ export default function TeacherDashboardPage() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.totalStudents}</div>
+            <div className="text-2xl font-bold">{stats?.totalStudents ?? 0}</div>
             <p className="text-xs text-muted-foreground">Across all classes</p>
           </CardContent>
         </Card>
@@ -64,7 +98,7 @@ export default function TeacherDashboardPage() {
             <MessageSquare className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.sessionsThisWeek}</div>
+            <div className="text-2xl font-bold">{stats?.sessionsThisWeek ?? 0}</div>
             <p className="text-xs text-muted-foreground">Tutoring sessions</p>
           </CardContent>
         </Card>
@@ -74,105 +108,72 @@ export default function TeacherDashboardPage() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.avgProgress}</div>
+            <div className="text-2xl font-bold">{stats?.avgProgress ?? "0%"}</div>
             <p className="text-xs text-muted-foreground">Completion rate</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Quick Actions & Recent Activity */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Quick Actions */}
+      {/* Live Sessions Monitoring */}
+      {teacherId && (
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2">
-              <Zap className="h-5 w-5 text-primary" />
-              Quick Actions
+              <Activity className="h-5 w-5 text-primary" />
+              Live Session Monitoring
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <a href="/teacher/classes" className="flex items-center gap-3 p-3 rounded-lg border hover:bg-accent transition-colors group">
-              <div className="p-2 rounded bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                <BookOpen className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="font-medium">Manage Classes</p>
-                <p className="text-sm text-muted-foreground">Create, edit, or archive classes</p>
-              </div>
-            </a>
-            <a href="/teacher/sessions" className="flex items-center gap-3 p-3 rounded-lg border hover:bg-accent transition-colors group">
-              <div className="p-2 rounded bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                <MessageSquare className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="font-medium">View Sessions</p>
-                <p className="text-sm text-muted-foreground">Monitor active tutoring sessions</p>
-              </div>
-            </a>
-            <a href="/teacher/sessions/new" className="flex items-center gap-3 p-3 rounded-lg border bg-primary text-primary-foreground hover:bg-primary/90 transition-colors group">
-              <div className="p-2 rounded bg-primary-foreground/10 text-primary-foreground group-hover:bg-primary-foreground/20 transition-colors">
-                <MessageSquare className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="font-medium">Start AI Tutoring</p>
-                <p className="text-sm text-primary-foreground/80">Launch AI tutor for a student</p>
-              </div>
-            </a>
-            <a href="/teacher/analytics" className="flex items-center gap-3 p-3 rounded-lg border hover:bg-accent transition-colors group">
-              <div className="p-2 rounded bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                <BarChart3 className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="font-medium">Analytics</p>
-                <p className="text-sm text-muted-foreground">View student progress reports</p>
-              </div>
-            </a>
+          <CardContent>
+            <LiveSessionsPanel 
+              teacherId={teacherId}
+              displayName={session?.user?.name || session?.user?.email}
+              usePolling={false}
+            />
           </CardContent>
         </Card>
+      )}
 
-        {/* Recent Activity */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5 text-primary" />
-              Recent Activity
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-              <div className="p-2 rounded bg-success/10 text-success">
-                <CheckCircle className="h-4 w-4" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium">Sarah Johnson</p>
-                <p className="text-sm text-muted-foreground">Completed Algebra I - Linear Equations session</p>
-              </div>
-              <span className="text-xs text-muted-foreground">2 hours ago</span>
-            </div>
-            <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-              <div className="p-2 rounded bg-warning/10 text-warning">
-                <AlertTriangle className="h-4 w-4" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium">Marcus Chen</p>
-                <p className="text-sm text-muted-foreground">Needs help with quadratic equations</p>
-              </div>
-              <span className="text-xs text-muted-foreground">4 hours ago</span>
-            </div>
-            <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-              <div className="p-2 rounded bg-primary/10 text-primary">
-                <Users className="h-4 w-4" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium">New student enrolled</p>
-                <p className="text-sm text-muted-foreground">Emily Rodriguez joined Period 3 Algebra I</p>
-              </div>
-              <span className="text-xs text-muted-foreground">1 day ago</span>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Quick Actions */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Link href="/teacher/classes" className="flex items-center gap-3 p-4 rounded-lg border hover:bg-accent transition-colors group">
+          <div className="p-2 rounded bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+            <BookOpen className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="font-medium">Manage Classes</p>
+            <p className="text-sm text-muted-foreground">Create, edit, or archive classes</p>
+          </div>
+        </Link>
+        <Link href="/teacher/sessions" className="flex items-center gap-3 p-4 rounded-lg border hover:bg-accent transition-colors group">
+          <div className="p-2 rounded bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+            <MessageSquare className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="font-medium">View Sessions</p>
+            <p className="text-sm text-muted-foreground">Monitor active tutoring sessions</p>
+          </div>
+        </Link>
+        <Link href="/teacher/sessions/new" className="flex items-center gap-3 p-4 rounded-lg border bg-primary text-primary-foreground hover:bg-primary/90 transition-colors group">
+          <div className="p-2 rounded bg-primary-foreground/10 text-primary-foreground group-hover:bg-primary-foreground/20 transition-colors">
+            <MessageSquare className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="font-medium">Start AI Tutoring</p>
+            <p className="text-sm text-primary-foreground/80">Launch AI tutor for a student</p>
+          </div>
+        </Link>
+        <Link href="/teacher/analytics" className="flex items-center gap-3 p-4 rounded-lg border hover:bg-accent transition-colors group">
+          <div className="p-2 rounded bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+            <BarChart3 className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="font-medium">Analytics</p>
+            <p className="text-sm text-muted-foreground">View student progress reports</p>
+          </div>
+        </Link>
       </div>
     </div>
   );
 }
 
+import { Activity } from "lucide-react";

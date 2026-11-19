@@ -6,15 +6,6 @@
 import { SignJWT, type JWTPayload } from 'jose';
 import { createRealtime, rawSql } from '@neon/realtime/server';
 import { drizzleAdapter } from '@neon/realtime-drizzle';
-import { and, desc, eq, sql } from 'drizzle-orm';
-import { getDb } from '@/lib/db';
-import {
-  tutorSessions,
-  messages,
-  classes,
-  students,
-  users,
-} from '@/db/schema';
 
 // ============================================================================
 // Legacy JWT token endpoint support (used by teacher-monitoring route)
@@ -112,7 +103,18 @@ export function getRealtimeClient() {
   if (cachedRealtime) return cachedRealtime;
 
   const secret = process.env.NEON_REALTIME_SECRET || process.env.NEXT_AUTH_SECRET;
+  console.log('[realtime/server] getRealtimeClient:', {
+    hasRealtimeSecret: !!process.env.NEON_REALTIME_SECRET,
+    hasNextAuthSecret: !!process.env.NEXT_AUTH_SECRET,
+    realtimeSecretPrefix: process.env.NEON_REALTIME_SECRET?.substring(0, 10),
+    nextAuthSecretPrefix: process.env.NEXT_AUTH_SECRET?.substring(0, 10),
+    realtimeEndpoint: process.env.NEON_REALTIME_ENDPOINT,
+    realtimeUrl: process.env.NEON_REALTIME_URL,
+    usingSecret: secret?.substring(0, 10)
+  });
+  
   if (!secret) {
+    console.error('[realtime/server] NEON_REALTIME_SECRET and NEXT_AUTH_SECRET are both missing!');
     // During build or if not configured, return a mock that throws on use
     return {
       seal: () => { throw new Error('Neon Realtime not configured: NEON_REALTIME_SECRET missing'); },
@@ -120,11 +122,17 @@ export function getRealtimeClient() {
     } as any;
   }
 
-  cachedRealtime = createRealtime({
-    secret,
-    db: 'neondb',
-    adapter: drizzleAdapter(),
-  });
+  try {
+    cachedRealtime = createRealtime({
+      secret,
+      db: 'neondb',
+      adapter: drizzleAdapter(),
+    });
+    console.log('[realtime/server] Realtime client created successfully');
+  } catch (error) {
+    console.error('[realtime/server] Failed to create realtime client:', error);
+    throw error;
+  }
 
   return cachedRealtime;
 }
@@ -132,64 +140,99 @@ export function getRealtimeClient() {
 /**
  * Creates a sealed live query for teacher's active sessions
  * Filters by classes taught by the teacher and active session status
+ * Uses shadow table (teacher_active_sessions_realtime) that bypasses RLS
  */
 export async function createTeacherSessionsSealedQuery(
   teacherId: string
 ) {
-  const database = getDb();
+  // Use shadow table that bypasses RLS (no RLS enabled on shadow tables)
+  const query = rawSql<{
+    id: string;
+    student_id: string;
+    student_name: string;
+    student_email: string;
+    class_id: string;
+    class_name: string;
+    class_subject: string;
+    status: string;
+    title: string;
+    message_count: number;
+    started_at: Date | null;
+    ended_at: Date | null;
+    paused_at: Date | null;
+    total_duration_seconds: number | null;
+    updated_at: Date;
+    teacher_id: string;
+  }>(
+    `SELECT 
+      id,
+      student_id,
+      student_name,
+      student_email,
+      class_id,
+      class_name,
+      class_subject,
+      status,
+      title,
+      message_count,
+      started_at,
+      ended_at,
+      paused_at,
+      total_duration_seconds,
+      updated_at,
+      teacher_id
+    FROM teacher_active_sessions_realtime
+    WHERE teacher_id = $1
+    ORDER BY started_at DESC`,
+    [teacherId]
+  );
 
-  const query = database
-    .select({
-      id: tutorSessions.id,
-      studentId: students.id,
-      studentName: sql<string>`${users.firstName} || ' ' || ${users.lastName}`,
-      studentEmail: users.email,
-      classId: classes.id,
-      className: classes.name,
-      classSubject: classes.subject,
-      status: tutorSessions.status,
-      title: tutorSessions.title,
-      messageCount: tutorSessions.messageCount,
-      startedAt: tutorSessions.startedAt,
-      endedAt: tutorSessions.endedAt,
-      pausedAt: tutorSessions.pausedAt,
-      totalDurationSeconds: tutorSessions.totalDurationSeconds,
-      lastMessageContent: sql<string | null>`(
-        select m.content from ${messages} m
-        where m.session_id = ${tutorSessions.id}
-        order by m.sequence desc limit 1
-      )`,
-      lastMessageAt: sql<string | null>`(
-        select m.created_at from ${messages} m
-        where m.session_id = ${tutorSessions.id}
-        order by m.sequence desc limit 1
-      )`,
-      updatedAt: tutorSessions.updatedAt,
-    })
-    .from(tutorSessions)
-    .innerJoin(classes, eq(classes.id, tutorSessions.classId))
-    .innerJoin(students, eq(students.id, tutorSessions.studentId))
-    .innerJoin(users, eq(users.id, students.userId))
-    .where(and(eq(classes.teacherId, teacherId), eq(tutorSessions.status, 'active')))
-    .orderBy(desc(tutorSessions.startedAt));
-
-  return getRealtimeClient().seal({ query });
+  console.log('[realtime/server] Creating sealed query for teacherId:', teacherId);
+  const client = getRealtimeClient();
+  console.log('[realtime/server] Realtime client created:', !!client);
+  
+  try {
+    const sealed = client.seal({ query });
+    console.log('[realtime/server] Sealed query created:', !!sealed);
+    return sealed;
+  } catch (error) {
+    console.error('[realtime/server] Seal error:', error);
+    throw error;
+  }
 }
 
 /**
  * Creates a sealed live query for messages in a specific session
+ * Uses shadow table (session_messages_realtime) that bypasses RLS
  */
 export async function createSessionMessagesSealedQuery(
   sessionId: string
 ) {
-  const database = getDb();
-
-  const query = database
-    .select()
-    .from(messages)
-    .where(eq(messages.sessionId, sessionId))
-    .orderBy(desc(messages.sequence))
-    .limit(100);
+  // Use shadow table that bypasses RLS (no RLS enabled on shadow tables)
+  const query = rawSql<{
+    id: string;
+    session_id: string;
+    role: string;
+    content: string;
+    content_type: string;
+    sequence: number;
+    metadata: Record<string, unknown>;
+    created_at: Date;
+  }>(
+    `SELECT 
+      id,
+      session_id,
+      role,
+      content,
+      content_type,
+      sequence,
+      metadata,
+      created_at
+    FROM session_messages_realtime
+    WHERE session_id = $1
+    ORDER BY sequence ASC`,
+    [sessionId]
+  );
 
   return getRealtimeClient().seal({ query });
 }

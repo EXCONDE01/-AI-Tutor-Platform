@@ -6,8 +6,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth/server';
 import { ensureAppUser } from '@/lib/auth/provision';
 import { db } from '@/lib/db';
-import { classes, classStudents, schools, teachers, users, students } from '@/db/schema';
-import { eq, desc, and } from 'drizzle-orm';
+import { classes, classStudents, teachers, users } from '@/db/schema';
+import { eq, desc, and, count } from 'drizzle-orm';
 
 function generateJoinCode(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -44,6 +44,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Teacher record not found' }, { status: 404 });
     }
 
+    // Get classes with student count (active enrollments only)
     const teacherClasses = await db
       .select({
         id: classes.id,
@@ -52,13 +53,44 @@ export async function GET(request: NextRequest) {
         gradeLevel: classes.gradeLevel,
         status: classes.status,
         joinCode: classes.joinCode,
+        description: classes.description,
+        maxStudents: classes.maxStudents,
+        term: classes.term,
+        year: classes.year,
         createdAt: classes.createdAt,
+        studentCount: count(classStudents.id),
       })
       .from(classes)
+      .leftJoin(
+        classStudents,
+        and(
+          eq(classStudents.classId, classes.id),
+          eq(classStudents.isActive, true)
+        )
+      )
       .where(eq(classes.teacherId, teacher.id))
+      .groupBy(
+        classes.id,
+        classes.name,
+        classes.subject,
+        classes.gradeLevel,
+        classes.status,
+        classes.joinCode,
+        classes.description,
+        classes.maxStudents,
+        classes.term,
+        classes.year,
+        classes.createdAt
+      )
       .orderBy(desc(classes.createdAt));
 
-    return NextResponse.json({ classes: teacherClasses });
+    // Coerce studentCount to number (drizzle count returns string/number depending on driver)
+    const formattedClasses = teacherClasses.map((cls) => ({
+      ...cls,
+      studentCount: Number(cls.studentCount) || 0,
+    }));
+
+    return NextResponse.json({ classes: formattedClasses });
   } catch (error) {
     console.error('[Classes GET] Error:', error);
     return NextResponse.json(
@@ -81,7 +113,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, subject, gradeLevel, schoolId } = body;
+    const { name, subject, gradeLevel, schoolId, description, maxStudents, term, year, status } = body;
 
     if (!name || !subject || gradeLevel === undefined) {
       return NextResponse.json(
@@ -116,14 +148,22 @@ export async function POST(request: NextRequest) {
         name,
         subject,
         gradeLevel: parseInt(gradeLevel),
-        status: 'active',
-        term: 'fall',
-        year: new Date().getFullYear(),
+        description: description ?? null,
+        maxStudents: maxStudents ?? 30,
+        status: status ?? 'active',
+        term: term ?? 'fall',
+        year: year ?? new Date().getFullYear(),
         joinCode: generateJoinCode(),
       })
       .returning();
 
-    return NextResponse.json({ class: newClass });
+    // Return class with studentCount: 0 to match the GET response shape
+    return NextResponse.json({
+      class: {
+        ...newClass,
+        studentCount: 0,
+      },
+    });
   } catch (error) {
     console.error('[Classes POST] Error:', error);
     return NextResponse.json(

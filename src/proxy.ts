@@ -108,12 +108,13 @@ async function hasValidSessionData(value: string | undefined): Promise<boolean> 
 }
 
 async function rewriteRequestCookies(request: NextRequest): Promise<NextRequest> {
-  if (isHttps(request)) return request;
-
+  // Always rewrite cookie names to add __Secure- prefix for Neon Auth SDK calls
+  // In production (HTTPS), cookies arrive with __Secure- prefix but we need to
+  // ensure they have it for the Neon Auth /get-session endpoint
   const cookie = request.headers.get("cookie");
   if (!cookie) return request;
 
-  // Browser sends `neon-auth.*` (rewritten); Neon Auth expects `__Secure-neon-auth.*`
+  // Neon Auth expects `__Secure-neon-auth.*` 
   const rewrittenCookie = rewriteCookieNames(cookie);
   if (rewrittenCookie === cookie) return request;
 
@@ -244,8 +245,11 @@ export default async function proxy(request: NextRequest) {
   }
 
   // Common path: just hand the rewritten cookie names to the app.
+  // Rewrite cookie names for ALL requests (both HTTP and HTTPS) because
+  // in production (HTTPS) cookies arrive with __Secure- prefix but
+  // getSession expects names without the prefix.
   const headers = new Headers(request.headers);
-  if (!isHttps(request) && cookieHeader) {
+  if (cookieHeader) {
     const rewrittenCookie = rewriteCookieNames(cookieHeader);
     if (rewrittenCookie !== cookieHeader) {
       headers.set("cookie", rewrittenCookie);
